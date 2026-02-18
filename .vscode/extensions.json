@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "Dart-Code.flutter",
+    "Dart-Code.dart-code",
+    "alexisvt.flutter-snippets",
+    "usernamehw.errorlens",
+    "hzgood.dart-data-class-generator",
+    "humao.rest-client",
+    "eamodio.gitlens",
+    "PKief.material-icon-theme",
+    "esbenp.prettier-vscode",
+    "CoenraadS.bracket-pair-colorizer-2",
+    "wayou.vscode-todo-highlight",
+    "christian-kohler.path-intellisense",
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": []
+}

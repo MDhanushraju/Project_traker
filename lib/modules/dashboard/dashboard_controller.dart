@@ -1,0 +1,2 @@
+// Dashboard controller
+class DashboardController {}
