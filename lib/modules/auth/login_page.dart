@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/roles.dart';
-import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/role_access.dart';
+import '../../../app/app_routes.dart';
+import 'auth_theme.dart';
 
-/// Login screen. Role picker with loading state; token stored via [AuthService].
+/// Welcome to Taker role selection screen. First page when opening the app.
+/// Responsive: different layout for web vs mobile.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -13,142 +15,155 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  AppRole? _loadingRole;
-
-  Future<void> _login(AppRole role) async {
-    setState(() => _loadingRole = role);
-    await AuthService.instance.loginWithRole(role);
-    if (!mounted) return;
-    setState(() => _loadingRole = null);
-    final r = AuthService.instance.role;
-    if (r != null) {
-      final route = RoleAccess.defaultRouteForRole(r);
-      Navigator.of(context).pushReplacementNamed(route);
-    }
+  void _onRoleSelected(AppRole role) {
+    Navigator.of(context).pushNamed(
+      AppRoutes.loginForm,
+      arguments: role,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isMobile = AuthLayout.isMobile(context);
+
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surfaceContainerLowest,
-            ],
-          ),
-        ),
-        child: SafeArea(
+        backgroundColor: AuthTheme.background(context),
+        body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: EdgeInsets.symmetric(
+                horizontal: AuthLayout.horizontalPadding(context),
+                vertical: isMobile ? 16 : 32,
+              ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
+                constraints: BoxConstraints(
+                  maxWidth: AuthLayout.maxFormWidth(context),
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 24),
-                    Icon(
-                      Icons.work_outline_rounded,
-                      size: 72,
-                      color: theme.colorScheme.primary,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Taker',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: AuthTheme.textPrimary(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            // TODO: Show help / onboarding
+                          },
+                          icon: const Icon(Icons.help_outline),
+                          color: AuthTheme.textSecondary(context),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AuthTheme.textPrimary(context).withValues(alpha: 0.1),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isMobile ? 24 : 32),
                     Text(
-                      'Project Tracker',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      'Welcome to Taker',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: AuthTheme.textPrimary(context),
+                            fontWeight: FontWeight.bold,
+                          ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Sign in as a role to continue',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      'Select your role to continue to your dashboard',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AuthTheme.textSecondary(context),
+                          ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 40),
+                    SizedBox(height: isMobile ? 24 : 32),
                     for (final role in AppRole.values)
-                      _RoleTile(
+                      _RoleCard(
                         role: role,
-                        isLoading: _loadingRole == role,
-                        onTap: () => _login(role),
+                        onTap: () => _onRoleSelected(role),
                       ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: isMobile ? 32 : 40),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'First time?',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AuthTheme.textSecondary(context),
+                              ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context)
+                                .pushReplacementNamed(AppRoutes.signUp);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AuthTheme.primaryBlue,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Sign up here'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
-class _RoleTile extends StatelessWidget {
-  const _RoleTile({
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
     required this.role,
-    required this.isLoading,
     required this.onTap,
   });
 
   final AppRole role;
-  final bool isLoading;
   final VoidCallback onTap;
+
+  IconData get _icon {
+    switch (role) {
+      case AppRole.admin:
+        return Icons.shield_outlined;
+      case AppRole.manager:
+        return Icons.dashboard_outlined;
+      case AppRole.member:
+        return Icons.person_outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isMobile = AuthLayout.isMobile(context);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: isMobile ? 10 : 12),
       elevation: 0,
+      color: AuthTheme.cardBackground(context),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
-        onTap: isLoading ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: isLoading
-                    ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
-                      )
-                    : Text(
-                        role.label[0],
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 20),
+              Icon(_icon, color: AuthTheme.primaryBlue, size: isMobile ? 24 : 28),
+              SizedBox(width: isMobile ? 12 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,26 +171,23 @@ class _RoleTile extends StatelessWidget {
                   children: [
                     Text(
                       role.label,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AuthTheme.textPrimary(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       RoleAccess.descriptionForRole(role),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AuthTheme.textSecondary(context),
+                          ),
                     ),
                   ],
                 ),
               ),
-              if (!isLoading)
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AuthTheme.textSecondary(context)),
             ],
           ),
         ),

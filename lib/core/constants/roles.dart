@@ -13,7 +13,7 @@ extension AppRoleExtension on AppRole {
       case AppRole.manager:
         return 'Manager';
       case AppRole.member:
-        return 'Member';
+        return 'Team Member';
     }
   }
 }

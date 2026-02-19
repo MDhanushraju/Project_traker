@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/theme/theme_mode_state.dart';
 import '../../../shared/layouts/main_layout.dart';
 import '../../app/app_routes.dart';
 import 'sections/client_management_section.dart';
@@ -65,6 +66,58 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 24),
+          Text(
+            'Appearance',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                RadioListTile<ThemeMode>(
+                  title: const Text('Light'),
+                  subtitle: const Text('Use light theme'),
+                  value: ThemeMode.light,
+                  groupValue: ThemeModeState.instance.themeMode,
+                  onChanged: (v) {
+                    if (v != null) {
+                      ThemeModeState.instance.setThemeMode(v);
+                    }
+                  },
+                ),
+                RadioListTile<ThemeMode>(
+                  title: const Text('Dark'),
+                  subtitle: const Text('Use dark theme'),
+                  value: ThemeMode.dark,
+                  groupValue: ThemeModeState.instance.themeMode,
+                  onChanged: (v) {
+                    if (v != null) {
+                      ThemeModeState.instance.setThemeMode(v);
+                    }
+                  },
+                ),
+                RadioListTile<ThemeMode>(
+                  title: const Text('System'),
+                  subtitle: const Text('Match device setting'),
+                  value: ThemeMode.system,
+                  groupValue: ThemeModeState.instance.themeMode,
+                  onChanged: (v) {
+                    if (v != null) {
+                      ThemeModeState.instance.setThemeMode(v);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
           Text(
             'Management',

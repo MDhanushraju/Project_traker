@@ -44,6 +44,22 @@ class AuthService {
     if (role != null) _auth.login(role);
   }
 
+  /// Sign up with name, email, password, id card, and role. Stores token + role like login.
+  /// Replace with real API when backend is ready.
+  Future<void> signUp({
+    required String fullName,
+    required String email,
+    required String password,
+    String? idCardNumber,
+    required AppRole role,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    final token = _mockTokenForRole(role);
+    await _tokens.setToken(token);
+    await _tokens.setStoredRole(role.name);
+    _auth.login(role, displayName: fullName.isNotEmpty ? fullName : null);
+  }
+
   /// Demo: login as role and persist (same flow as [login] but with mock token).
   /// UI uses this for role picker; token is still stored so refresh keeps session.
   Future<void> loginWithRole(AppRole role) async {

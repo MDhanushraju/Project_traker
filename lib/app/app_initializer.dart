@@ -1,12 +1,16 @@
 import '../core/auth/auth_service.dart';
+import '../core/theme/theme_mode_state.dart';
 
 /// Runs one-time app setup before [runApp].
-/// Restores auth session so refresh keeps user logged in.
+/// Restores auth session and theme preference.
 class AppInitializer {
   AppInitializer._();
 
-  /// Call before [runApp]. Restores session from storage (token + role).
+  /// Call before [runApp]. Restores session (token + role) and theme mode.
   static Future<void> init() async {
-    await AuthService.instance.restoreSession();
+    await Future.wait([
+      AuthService.instance.restoreSession(),
+      ThemeModeState.load(),
+    ]);
   }
 }

@@ -50,11 +50,11 @@ class RoleAccess {
   static String descriptionForRole(AppRole role) {
     switch (role) {
       case AppRole.admin:
-        return 'Full access: dashboard, projects, tasks';
+        return 'Manage workspace settings and billing';
       case AppRole.manager:
-        return 'Dashboard, projects & tasks';
+        return 'Track projects and oversee team progress';
       case AppRole.member:
-        return 'Tasks only';
+        return 'Complete tasks and collaborate with peers';
     }
   }
 }

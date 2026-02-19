@@ -18,14 +18,26 @@ class AuthGuard {
   static GuardResult check(String routeName, AuthState auth) {
     final user = auth.currentUser;
 
-    // Not logged in → only login allowed
+    // Not logged in → sign-up, login, login-form, forgot-password flow allowed
     if (user == null) {
-      if (routeName == AppRoutes.login) return const GuardResult.allow();
+      if (routeName == AppRoutes.signUp ||
+          routeName == AppRoutes.login ||
+          routeName == AppRoutes.loginForm ||
+          routeName == AppRoutes.forgotPassword ||
+          routeName == AppRoutes.forgotPasswordOtp ||
+          routeName == AppRoutes.resetPassword) {
+        return const GuardResult.allow();
+      }
       return const GuardResult.redirect(AppRoutes.login);
     }
 
-    // Logged in: visiting login → redirect to default home by role
-    if (routeName == AppRoutes.login) {
+    // Logged in: visiting auth pages → redirect to default home by role
+    if (routeName == AppRoutes.signUp ||
+        routeName == AppRoutes.login ||
+        routeName == AppRoutes.loginForm ||
+        routeName == AppRoutes.forgotPassword ||
+        routeName == AppRoutes.forgotPasswordOtp ||
+        routeName == AppRoutes.resetPassword) {
       return GuardResult.redirect(user.defaultRoute);
     }
 
