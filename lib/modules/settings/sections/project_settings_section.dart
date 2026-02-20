@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Settings section: project settings.
+import '../../../app/app_routes.dart';
+
+/// Settings section: Project Settings. Admin only.
 class ProjectSettingsSection extends StatelessWidget {
   const ProjectSettingsSection({super.key});
 
@@ -12,17 +14,25 @@ class ProjectSettingsSection extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 12),
       child: ListTile(
-        leading: Icon(Icons.tune_rounded, color: theme.colorScheme.primary),
-        title: const Text('Project settings'),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.settings_rounded, color: theme.colorScheme.primary, size: 24),
+        ),
+        title: const Text('Project Settings'),
         subtitle: Text(
-          'Defaults and preferences',
+          'Configure project defaults, permissions, workflows, and preferences that apply across all projects.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+        onTap: () => Navigator.of(context).pushNamed(AppRoutes.projectSettings),
       ),
     );
   }

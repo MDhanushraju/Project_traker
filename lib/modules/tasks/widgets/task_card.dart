@@ -98,12 +98,16 @@ class _StatusIndicator extends StatelessWidget {
     IconData icon;
     switch (status) {
       case TaskStatus.done:
-        color = theme.colorScheme.primary;
+        color = Colors.green;
         icon = Icons.check_circle_rounded;
         break;
       case TaskStatus.inProgress:
         color = theme.colorScheme.tertiary;
         icon = Icons.pending_rounded;
+        break;
+      case TaskStatus.yetToStart:
+        color = theme.colorScheme.outline;
+        icon = Icons.schedule_rounded;
         break;
       default:
         color = theme.colorScheme.outline;
@@ -121,11 +125,7 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = status == TaskStatus.inProgress
-        ? 'In progress'
-        : status == TaskStatus.done
-            ? 'Done'
-            : 'To do';
+    final label = TaskStatus.label(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

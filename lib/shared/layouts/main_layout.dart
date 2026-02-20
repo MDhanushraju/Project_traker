@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_state.dart';
 import '../../core/auth/role_access.dart';
+import '../widgets/user_profile_menu.dart';
 import 'sidebar.dart';
 import 'mobile_nav.dart';
 
@@ -118,11 +119,18 @@ class _DesktopShell extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
-                    child: Text(
-                      title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const UserProfileMenu(),
+                      ],
                     ),
                   ),
                   Expanded(child: child),
@@ -160,6 +168,7 @@ class _MobileShell extends StatelessWidget {
           icon: const Icon(Icons.menu_rounded),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
+        actions: const [UserProfileMenu()],
       ),
       drawer: Drawer(
         child: Sidebar(

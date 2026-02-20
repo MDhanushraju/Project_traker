@@ -99,7 +99,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           controller: _emailController,
                           style: TextStyle(color: AuthTheme.textPrimary(context)),
                           keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Email Address',
                             hintText: 'example@email.com',
                             prefixIcon: Icon(

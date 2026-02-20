@@ -47,19 +47,25 @@ class _TaskListPageState extends State<TaskListPage> {
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'To do',
+                      label: 'Yet to Start',
+                      selected: _filter == TaskStatus.yetToStart,
+                      onTap: () => setState(() => _filter = TaskStatus.yetToStart),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Todo',
                       selected: _filter == TaskStatus.todo,
                       onTap: () => setState(() => _filter = TaskStatus.todo),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'In progress',
+                      label: 'Ongoing',
                       selected: _filter == TaskStatus.inProgress,
                       onTap: () => setState(() => _filter = TaskStatus.inProgress),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Done',
+                      label: 'Completed',
                       selected: _filter == TaskStatus.done,
                       onTap: () => setState(() => _filter = TaskStatus.done),
                     ),

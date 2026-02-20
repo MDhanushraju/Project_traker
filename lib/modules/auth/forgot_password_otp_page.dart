@@ -127,7 +127,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
                             child: TextFormField(
                               controller: _controllers[i],
                               focusNode: _focusNodes[i],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AuthTheme.textPrimary(context),
                                 fontSize: 24,
                                 fontWeight: FontWeight.w600,
@@ -148,7 +148,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
                                   _verify();
                                 }
                               },
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: '-',
                                 hintStyle: TextStyle(
                                   color: AuthTheme.textSecondary(context),

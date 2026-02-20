@@ -15,7 +15,19 @@ import '../modules/auth/reset_password_page.dart';
 import '../modules/dashboard/dashboard_page.dart';
 import '../modules/projects/project_list_page.dart';
 import '../modules/tasks/task_list_page.dart';
+import '../modules/users/users_page.dart';
 import '../modules/settings/settings_page.dart';
+import '../modules/assign_project/assign_project_page.dart';
+import '../modules/team/team_overview_page.dart';
+import '../modules/profile/personal_details_page.dart';
+import '../modules/users/user_details_page.dart';
+import '../modules/clients/clients_page.dart';
+import '../modules/settings/project_settings_page.dart';
+import '../modules/projects/add_new_project_page.dart';
+import '../modules/projects/add_small_change_page.dart';
+import '../modules/projects/update_existing_project_page.dart';
+import '../modules/team/shift_team_member_page.dart';
+import '../modules/tasks/assign_task_page.dart';
 
 /// All known route names. Unknown routes are redirected.
 const Set<String> _kKnownRoutes = {
@@ -28,7 +40,19 @@ const Set<String> _kKnownRoutes = {
   AppRoutes.dashboard,
   AppRoutes.projects,
   AppRoutes.tasks,
+  AppRoutes.users,
   AppRoutes.settings,
+  AppRoutes.assignProject,
+  AppRoutes.teamOverview,
+  AppRoutes.personalDetails,
+  AppRoutes.userDetails,
+  AppRoutes.clients,
+  AppRoutes.projectSettings,
+  AppRoutes.addNewProject,
+  AppRoutes.addSmallChange,
+  AppRoutes.updateExistingProject,
+  AppRoutes.shiftTeamMember,
+  AppRoutes.assignTask,
 };
 
 /// Root widget. MaterialApp with theme and guarded routes.
@@ -57,7 +81,7 @@ class _AppState extends State<App> {
   void _onAuthChanged() => setState(() {});
   void _onThemeChanged() => setState(() {});
 
-  static Widget _buildPage(String routeName) {
+  static Widget _buildPage(BuildContext context, String routeName) {
     switch (routeName) {
       case AppRoutes.signUp:
         return const SignUpPage();
@@ -77,8 +101,46 @@ class _AppState extends State<App> {
         return const ProjectListPage();
       case AppRoutes.tasks:
         return const TaskListPage();
+      case AppRoutes.users:
+        return const UsersPage();
       case AppRoutes.settings:
         return const SettingsPage();
+      case AppRoutes.assignProject:
+        return const AssignProjectPage();
+      case AppRoutes.teamOverview:
+        final args = ModalRoute.of(context)?.settings.arguments;
+        return TeamOverviewPage(
+          projectId: args is String ? args : null,
+        );
+      case AppRoutes.personalDetails:
+        return const PersonalDetailsPage();
+      case AppRoutes.clients:
+        return const ClientsPage();
+      case AppRoutes.projectSettings:
+        return const ProjectSettingsPage();
+      case AppRoutes.addNewProject:
+        return const AddNewProjectPage();
+      case AppRoutes.addSmallChange:
+        return const AddSmallChangePage();
+      case AppRoutes.updateExistingProject:
+        return const UpdateExistingProjectPage();
+      case AppRoutes.shiftTeamMember:
+        return const ShiftTeamMemberPage();
+      case AppRoutes.assignTask:
+        return const AssignTaskPage();
+      case AppRoutes.userDetails:
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args is UserDetailsArgs) {
+          return UserDetailsPage(
+            name: args.name,
+            title: args.title,
+            role: args.role,
+            projects: args.projects,
+            status: args.status,
+            isTemporary: args.isTemporary,
+          );
+        }
+        return const LoginPage();
       default:
         return const LoginPage();
     }
@@ -105,7 +167,7 @@ class _AppState extends State<App> {
               name: effectiveRoute,
               arguments: settings.arguments,
             ),
-            builder: (_) => _buildPage(effectiveRoute),
+            builder: (ctx) => _buildPage(ctx, effectiveRoute),
           );
         }
 

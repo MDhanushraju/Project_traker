@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/constants/roles.dart';
 import '../../../core/theme/theme_mode_state.dart';
 import '../../../shared/layouts/main_layout.dart';
 import '../../app/app_routes.dart';
+import 'sections/add_new_project_section.dart';
 import 'sections/client_management_section.dart';
 import 'sections/project_settings_section.dart';
 import 'sections/user_management_section.dart';
@@ -118,18 +120,21 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Management',
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+          if (user?.role == AppRole.admin) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Admin',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          const UserManagementSection(),
-          const ClientManagementSection(),
-          const ProjectSettingsSection(),
+            const SizedBox(height: 12),
+            const UserManagementSection(),
+            const AddNewProjectSection(),
+            const ClientManagementSection(),
+            const ProjectSettingsSection(),
+          ],
           const SizedBox(height: 32),
         ],
       ),

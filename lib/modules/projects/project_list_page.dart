@@ -24,8 +24,8 @@ class ProjectListPage extends StatelessWidget {
           icon: Icons.folder_rounded,
           title: 'No projects yet',
           subtitle: 'Create a project to get started.',
-          actionLabel: 'Add project',
-          onAction: () {},
+          actionLabel: 'Add New Project',
+          onAction: () => Navigator.of(context).pushNamed(AppRoutes.addNewProject),
         ),
       );
     }
@@ -36,20 +36,36 @@ class ProjectListPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          FadeIn(
-            child: Text(
-              '${projects.length} project${projects.length == 1 ? '' : 's'}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              FadeIn(
+                child: Text(
+                  '${projects.length} project${projects.length == 1 ? '' : 's'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addNewProject),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Add New Project'),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           ...projects.map(
             (p) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: FadeIn(
-                child: ProjectCard(project: p),
+                child: ProjectCard(
+                  project: p,
+                  onTap: () => Navigator.of(context).pushNamed(
+                    AppRoutes.teamOverview,
+                    arguments: p.id,
+                  ),
+                ),
               ),
             ),
           ),

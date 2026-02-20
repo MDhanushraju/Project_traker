@@ -2,6 +2,7 @@
 enum AppRole {
   admin,
   manager,
+  teamLeader,
   member,
 }
 
@@ -12,6 +13,8 @@ extension AppRoleExtension on AppRole {
         return 'Admin';
       case AppRole.manager:
         return 'Manager';
+      case AppRole.teamLeader:
+        return 'Team Leader';
       case AppRole.member:
         return 'Team Member';
     }

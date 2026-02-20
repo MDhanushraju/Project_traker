@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/project_model.dart';
 
+Color _statusColor(String status, ThemeData theme) {
+  final s = status.toUpperCase();
+  if (s.contains('PRIORITY') || s.contains('ACTIVE')) return theme.colorScheme.primary;
+  if (s.contains('COMPLETED') || s.contains('DONE')) return Colors.green;
+  if (s.contains('REVIEW') || s.contains('ON HOLD')) return Colors.orange;
+  return theme.colorScheme.onSurfaceVariant;
+}
+
 /// Card for a single project. Uses theme. Shows progress when available.
 class ProjectCard extends StatelessWidget {
   const ProjectCard({
@@ -55,34 +63,11 @@ class ProjectCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            status,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   Icon(
@@ -116,6 +101,48 @@ class ProjectCard extends StatelessWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox.shrink(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (status.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _statusColor(status, theme)
+                                .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            status.toUpperCase(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: _statusColor(status, theme),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      if (status.isNotEmpty) const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: onTap ?? () {},
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: const Text('Details'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),

@@ -213,7 +213,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
               (v == null || v.isEmpty) ? 'Required' : null,
           decoration: InputDecoration(
             labelText: 'Password',
-            prefixIcon: const Icon(
+            prefixIcon: Icon(
               Icons.lock_outline,
               color: AuthTheme.textSecondary(context),
               size: 22,
@@ -276,22 +276,22 @@ class _LoginFormPageState extends State<LoginFormPage> {
             children: [
               OutlinedButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.g_mobiledata,
+                icon: Icon(Icons.g_mobiledata,
                     size: 24, color: AuthTheme.textPrimary(context)),
                 label: const Text('Google'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AuthTheme.textPrimary(context),
-                  side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                  side: BorderSide(color: AuthTheme.textSecondary(context)),
                 ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
+                icon: Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
                 label: const Text('Apple'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AuthTheme.textPrimary(context),
-                  side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                  side: BorderSide(color: AuthTheme.textSecondary(context)),
                 ),
               ),
             ],
@@ -301,12 +301,12 @@ class _LoginFormPageState extends State<LoginFormPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.g_mobiledata,
+                  icon: Icon(Icons.g_mobiledata,
                       size: 24, color: AuthTheme.textPrimary(context)),
                   label: const Text('Google'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AuthTheme.textPrimary(context),
-                    side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                    side: BorderSide(color: AuthTheme.textSecondary(context)),
                   ),
                 ),
               ),
@@ -314,11 +314,11 @@ class _LoginFormPageState extends State<LoginFormPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
+                  icon: Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
                   label: const Text('Apple'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AuthTheme.textPrimary(context),
-                    side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                    side: BorderSide(color: AuthTheme.textSecondary(context)),
                   ),
                 ),
               ),

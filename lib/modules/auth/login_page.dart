@@ -139,6 +139,8 @@ class _RoleCard extends StatelessWidget {
         return Icons.shield_outlined;
       case AppRole.manager:
         return Icons.dashboard_outlined;
+      case AppRole.teamLeader:
+        return Icons.group_work_outlined;
       case AppRole.member:
         return Icons.person_outline;
     }
@@ -186,7 +188,7 @@ class _RoleCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios,
+              Icon(Icons.arrow_forward_ios,
                     size: 14, color: AuthTheme.textSecondary(context)),
             ],
           ),

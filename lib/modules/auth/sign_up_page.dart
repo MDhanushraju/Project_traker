@@ -79,7 +79,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 child: Container(
                   padding: EdgeInsets.all(AuthLayout.cardPadding(context)),
                   decoration: BoxDecoration(
-                    color: AuthTheme.cardBackground,
+                    color: AuthTheme.cardBackground(context),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -218,8 +218,7 @@ class _SignUpPageState extends State<SignUpPage> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildHeader(bool isMobile) {
@@ -360,21 +359,21 @@ class _SignUpPageState extends State<SignUpPage> {
             children: [
               OutlinedButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.g_mobiledata, size: 24, color: AuthTheme.textPrimary(context)),
+                icon: Icon(Icons.g_mobiledata, size: 24, color: AuthTheme.textPrimary(context)),
                 label: const Text('Google'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AuthTheme.textPrimary(context),
-                  side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                  side: BorderSide(color: AuthTheme.textSecondary(context)),
                 ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
+                icon: Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
                 label: const Text('Apple'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AuthTheme.textPrimary(context),
-                  side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                  side: BorderSide(color: AuthTheme.textSecondary(context)),
                 ),
               ),
             ],
@@ -384,11 +383,11 @@ class _SignUpPageState extends State<SignUpPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.g_mobiledata, size: 24, color: AuthTheme.textPrimary(context)),
+                  icon: Icon(Icons.g_mobiledata, size: 24, color: AuthTheme.textPrimary(context)),
                   label: const Text('Google'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AuthTheme.textPrimary(context),
-                    side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                    side: BorderSide(color: AuthTheme.textSecondary(context)),
                   ),
                 ),
               ),
@@ -396,11 +395,11 @@ class _SignUpPageState extends State<SignUpPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
+                  icon: Icon(Icons.apple, color: AuthTheme.textPrimary(context)),
                   label: const Text('Apple'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AuthTheme.textPrimary(context),
-                    side: const BorderSide(color: AuthTheme.textSecondary(context)),
+                    side: BorderSide(color: AuthTheme.textSecondary(context)),
                   ),
                 ),
               ),

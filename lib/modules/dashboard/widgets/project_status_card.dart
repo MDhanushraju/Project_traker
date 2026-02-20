@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 
-/// Card showing project status. Uses theme.
+/// Card showing project status. Uses theme. Optional [onTap] for navigation.
 class ProjectStatusCard extends StatelessWidget {
   const ProjectStatusCard({
     super.key,
     this.title = 'Project',
     this.status = 'Active',
     this.icon,
+    this.onTap,
   });
 
   final String title;
   final String status;
   final IconData? icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +23,10 @@ class ProjectStatusCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -51,6 +56,7 @@ class ProjectStatusCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

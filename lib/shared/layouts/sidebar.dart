@@ -19,9 +19,10 @@ class SidebarNav {
   SidebarNav._();
 
   static const Map<String, (String label, IconData icon)> _routeMeta = {
-    AppRoutes.dashboard: ('Dashboard', Icons.dashboard_rounded),
+    AppRoutes.dashboard: ('Home', Icons.home_rounded),
     AppRoutes.projects: ('Projects', Icons.folder_rounded),
     AppRoutes.tasks: ('Tasks', Icons.task_alt_rounded),
+    AppRoutes.users: ('Users', Icons.people_rounded),
     AppRoutes.settings: ('Settings', Icons.settings_rounded),
   };
 

@@ -11,5 +11,17 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String projects = '/projects';
   static const String tasks = '/tasks';
+  static const String users = '/users';
   static const String settings = '/settings';
+  static const String assignProject = '/assign-project';
+  static const String teamOverview = '/team-overview';
+  static const String personalDetails = '/personal-details';
+  static const String userDetails = '/user-details';
+  static const String clients = '/clients';
+  static const String projectSettings = '/project-settings';
+  static const String addNewProject = '/add-new-project';
+  static const String addSmallChange = '/add-small-change';
+  static const String updateExistingProject = '/update-existing-project';
+  static const String shiftTeamMember = '/shift-team-member';
+  static const String assignTask = '/assign-task';
 }

@@ -117,7 +117,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                           validator: _validatePassword,
                           decoration: InputDecoration(
                             labelText: 'New Password',
-                            prefixIcon: const Icon(
+                            prefixIcon: Icon(
                               Icons.lock_outline,
                               color: AuthTheme.textSecondary(context),
                               size: 22,
@@ -148,7 +148,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                           },
                           decoration: InputDecoration(
                             labelText: 'Confirm New Password',
-                            prefixIcon: const Icon(
+                            prefixIcon: Icon(
                               Icons.refresh,
                               color: AuthTheme.textSecondary(context),
                               size: 22,

@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/project-Tracker
+    username: postgres
+    password: Dhanush@03
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: your-256-bit-secret-key-for-taker-auth-backend-min-32-chars
+  expiration-ms: 86400000
+  reset-expiration-ms: 900000
+
+app:
+  mail:
+    enabled: false
