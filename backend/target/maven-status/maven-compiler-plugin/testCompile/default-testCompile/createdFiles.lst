@@ -1,0 +1,9 @@
+com\taker\auth\service\AuthServiceTest$IsValidPasswordTests.class
+com\taker\auth\service\AuthServiceTest$LoginTests.class
+com\taker\auth\service\TaskServiceTest$UpdateStatusTests.class
+com\taker\auth\service\TaskServiceTest.class
+com\taker\auth\service\TaskServiceTest$AssignTaskTests.class
+com\taker\auth\service\AuthServiceTest$ParseRoleTests.class
+com\taker\auth\service\AuthServiceTest.class
+com\taker\auth\service\TaskServiceTest$DeleteTaskTests.class
+com\taker\auth\service\AuthServiceTest$SignUpTests.class
