@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/roles.dart';
 import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/auth_exception.dart';
 import '../../../core/auth/role_access.dart';
 import '../../../app/app_routes.dart';
 import 'auth_theme.dart';
@@ -45,14 +46,38 @@ class _LoginFormPageState extends State<LoginFormPage> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    await AuthService.instance.loginWithRole(_role);
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      await AuthService.instance.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+        idCardNumber: _idCardController.text.trim().isEmpty
+            ? null
+            : _idCardController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-    final r = AuthService.instance.role;
-    if (r != null) {
-      final route = RoleAccess.defaultRouteForRole(r);
-      Navigator.of(context).pushReplacementNamed(route);
+      final r = AuthService.instance.role;
+      if (r != null) {
+        if (r != _role) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'You selected ${_role.label} portal. Your account is ${r.label} — redirecting to ${r.label} dashboard.',
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        final route = RoleAccess.defaultRouteForRole(r);
+        Navigator.of(context).pushReplacementNamed(route);
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     }
   }
 
@@ -121,14 +146,36 @@ class _LoginFormPageState extends State<LoginFormPage> {
                               .bodyLarge
                               ?.copyWith(color: AuthTheme.textSecondary(context)),
                         ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AuthTheme.primaryBlue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AuthTheme.primaryBlue.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, size: 18, color: AuthTheme.primaryBlue),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'You are logging in to the ${role.label} portal',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AuthTheme.textPrimary(context),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 28),
                         _buildInput(
                           controller: _idCardController,
-                          label: 'ID Card Number',
-                          hint: '000-0000-000',
+                          label: 'ID Card Number (optional)',
+                          hint: 'Leave blank if not set during signup',
                           icon: Icons.badge_outlined,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
                         ),
                         const SizedBox(height: 16),
                         _buildInput(

@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
+import '../../../core/auth/auth_exception.dart';
 import 'auth_theme.dart';
 
 /// Reset Password: enter new password and confirm.
@@ -40,14 +43,53 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final token = (args is Map ? args['resetToken'] : null)?.toString();
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired. Please start over.')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+      return;
+    }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        headers: {'Authorization': 'Bearer $token'},
+      ));
+      final res = await dio.post<Map<String, dynamic>>(
+        '/api/auth/reset-password',
+        data: {
+          'newPassword': _passwordController.text,
+          'confirmPassword': _confirmController.text,
+        },
+      );
+      if (!mounted) return;
+      final data = res.data;
+      if (data == null || data['success'] != true) {
+        throw AuthException((data?['message'] ?? 'Reset failed').toString());
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset successfully. Please log in.')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.login,
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
+          e.message ?? 'Reset failed';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

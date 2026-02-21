@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/auth/auth_state.dart';
 import '../../../core/constants/roles.dart';
+import '../../../data/data_provider.dart';
 import '../../../data/mock_data.dart';
-import '../../../data/team_members_data.dart';
 
 /// Assign tasks to team members. Admin/Manager: all users. Team Leader: only their team members.
 class AssignTaskPage extends StatefulWidget {
@@ -13,34 +13,81 @@ class AssignTaskPage extends StatefulWidget {
   State<AssignTaskPage> createState() => _AssignTaskPageState();
 }
 
+class _UserOption {
+  final int id;
+  final String name;
+  _UserOption({required this.id, required this.name});
+}
+
 class _AssignTaskPageState extends State<AssignTaskPage> {
   String? _selectedUser;
+  int? _selectedUserId;
   String? _selectedTask;
   String? _selectedProject;
   DateTime? _dueDate;
   final _taskTitleController = TextEditingController();
   bool _createNewTask = false;
   bool _sendNotification = true;
+  List<_UserOption> _assignableUsers = [];
+  bool _loadingUsers = true;
 
-  /// Dynamic user list: Team Leader sees only their team members (by project);
-  /// Admin and Manager see all users.
-  List<String> get _users {
+  List<String> get _userNames =>
+      _assignableUsers.map((u) => u.name).toList()..sort();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssignableUsers();
+  }
+
+  Future<void> _loadAssignableUsers() async {
+    setState(() => _loadingUsers = true);
     final role = AuthState.instance.currentUser?.role;
     if (role == AppRole.teamLeader) {
       final teamMap = MockData.teamLeaderTeamMembers;
       final projects = _selectedProject != null
           ? [_selectedProject!]
           : MockData.teamLeaderAssignedProjects;
-      final names = <String>{};
+      final byId = <int, _UserOption>{};
       for (final p in projects) {
         for (final m in teamMap[p] ?? []) {
-          names.add(m['name'] ?? '');
+          final id = m['id'];
+          if (id != null) {
+            final idInt = id is int ? id : int.tryParse(id.toString());
+            if (idInt != null && !byId.containsKey(idInt)) {
+              byId[idInt] = _UserOption(
+                id: idInt,
+                name: (m['name'] ?? '').toString(),
+              );
+            }
+          }
         }
       }
-      return names.where((n) => n.isNotEmpty).toList()..sort();
+      _assignableUsers = byId.values.toList();
+    } else {
+      final users = await DataProvider.instance.getAllUsers();
+      _assignableUsers = users
+          .map((u) {
+            final id = u['id'];
+            if (id == null) return null;
+            final idInt = id is int ? id : int.tryParse(id.toString());
+            final name = (u['name'] ?? u['fullName'] ?? '').toString();
+            return idInt != null ? _UserOption(id: idInt, name: name) : null;
+          })
+          .whereType<_UserOption>()
+          .toList();
     }
-    final names = teamMembers.map((m) => m.name).toSet().toList()..sort();
-    return names;
+    setState(() {
+      _loadingUsers = false;
+      if (_selectedUser != null) {
+        for (final o in _assignableUsers) {
+          if (o.name == _selectedUser) {
+            _selectedUserId = o.id;
+            break;
+          }
+        }
+      }
+    });
   }
 
   List<String> get _existingTasks =>
@@ -91,20 +138,38 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
                 icon: Icons.folder_outlined,
                 value: _selectedProject ?? 'All',
                 options: ['All', ...MockData.teamLeaderAssignedProjects],
-                onSelected: (v) => setState(() {
-                  _selectedProject = v == 'All' ? null : v;
-                  _selectedUser = null;
-                }),
+                onSelected: (v) {
+                  setState(() {
+                    _selectedProject = v == 'All' ? null : v;
+                    _selectedUser = null;
+                    _selectedUserId = null;
+                  });
+                  _loadAssignableUsers();
+                },
               ),
               const SizedBox(height: 16),
             ],
             _DropdownField(
               label: 'Assign to',
-              hint: _users.isEmpty ? 'No team members' : 'Select team member',
+              hint: _loadingUsers
+                  ? 'Loading...'
+                  : (_userNames.isEmpty ? 'No team members' : 'Select team member'),
               icon: Icons.person_outline_rounded,
               value: _selectedUser,
-              options: _users,
-              onSelected: (v) => setState(() => _selectedUser = v),
+              options: _userNames,
+              onSelected: (v) {
+                int? id;
+                for (final o in _assignableUsers) {
+                  if (o.name == v) {
+                    id = o.id;
+                    break;
+                  }
+                }
+                setState(() {
+                  _selectedUser = v;
+                  _selectedUserId = id;
+                });
+              },
             ),
             const SizedBox(height: 20),
             SwitchListTile(
@@ -220,8 +285,8 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
     );
   }
 
-  void _onAssign() {
-    if (_selectedUser == null) {
+  Future<void> _onAssign() async {
+    if (_selectedUserId == null || _selectedUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select a user')),
       );
@@ -234,10 +299,37 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Task "$taskTitle" assigned to $_selectedUser')),
+    String? dueStr;
+    if (_dueDate != null) {
+      dueStr =
+          '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}';
+    }
+    int? projectId;
+    if (_selectedProject != null && AuthState.instance.currentUser?.role == AppRole.teamLeader) {
+      for (final p in MockData.projects) {
+        if (p.name == _selectedProject && p.id != null) {
+          projectId = int.tryParse(p.id!);
+          break;
+        }
+      }
+    }
+    final ok = await DataProvider.instance.assignTask(
+      userId: _selectedUserId!,
+      taskTitle: taskTitle,
+      dueDate: dueStr,
+      projectId: projectId,
     );
-    Navigator.of(context).pop();
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Task "$taskTitle" assigned to $_selectedUser')),
+      );
+      Navigator.of(context).pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to assign task')),
+      );
+    }
   }
 }
 

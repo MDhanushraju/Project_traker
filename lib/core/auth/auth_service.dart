@@ -1,4 +1,8 @@
+import 'package:dio/dio.dart';
+
 import '../constants/roles.dart';
+import 'auth_exception.dart';
+import '../../app/app_config.dart';
 import 'auth_state.dart';
 import 'token_manager.dart';
 
@@ -30,10 +34,9 @@ class AuthService {
     }
   }
 
-  /// Login with email/password. Calls API, stores JWT + role, updates auth state.
-  /// Replace mock with real [ApiClient] when backend is ready.
-  Future<void> login(String email, String password) async {
-    final response = await _loginApi(email, password);
+  /// Login with email + password (optionally idCardNumber). Calls API, stores JWT + role, updates auth state.
+  Future<void> login(String email, String password, {String? idCardNumber}) async {
+    final response = await _loginApi(email, password, idCardNumber: idCardNumber);
     final token = response['token'] as String?;
     final roleStr = response['role'] as String?;
     if (token == null || roleStr == null) return;
@@ -44,29 +47,72 @@ class AuthService {
     if (role != null) _auth.login(role);
   }
 
-  /// Sign up with name, email, password, id card, and role. Stores token + role like login.
-  /// Replace with real API when backend is ready.
+  /// Sign up via API. On success, does NOT auto-login; user must go to login.
+  /// Throws [AuthException] on API error (email exists, validation failed, etc).
+  /// [position] is required for teamLeader and member (e.g. Developer, Tester).
   Future<void> signUp({
     required String fullName,
     required String email,
     required String password,
+    required String confirmPassword,
     String? idCardNumber,
     required AppRole role,
+    String? position,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final token = _mockTokenForRole(role);
-    await _tokens.setToken(token);
-    await _tokens.setStoredRole(role.name);
-    _auth.login(role, displayName: fullName.isNotEmpty ? fullName : null);
+    try {
+      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final res = await dio.post<Map<String, dynamic>>(
+        '/api/auth/signup',
+        data: {
+          'fullName': fullName.trim(),
+          'email': email.trim().toLowerCase(),
+          'password': password,
+          'confirmPassword': confirmPassword,
+          if (idCardNumber != null && idCardNumber.trim().isNotEmpty) 'idCardNumber': idCardNumber.trim(),
+          'role': role.name,
+          if (position != null && position.trim().isNotEmpty) 'position': position.trim(),
+        },
+      );
+      final data = res.data;
+      if (data == null || data['success'] != true) {
+        throw AuthException((data?['message'] ?? 'Sign up failed').toString());
+      }
+    } on DioException catch (e) {
+      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
+          e.message ??
+          'Sign up failed';
+      throw AuthException(msg);
+    }
   }
 
-  /// Demo: login as role and persist (same flow as [login] but with mock token).
-  /// UI uses this for role picker; token is still stored so refresh keeps session.
+  /// Login as role (calls backend /api/auth/login-with-role).
+  /// Falls back to mock token if API fails (offline/demo).
   Future<void> loginWithRole(AppRole role) async {
-    final token = _mockTokenForRole(role);
-    await _tokens.setToken(token);
+    try {
+      final res = await _loginWithRoleApi(role);
+      if (res != null && res['token'] != null) {
+        await _tokens.setToken(res['token'] as String);
+        final roleStr = (res['role'] ?? role.name).toString();
+        await _tokens.setStoredRole(roleStr);
+        final parsedRole = _parseRole(roleStr) ?? role;
+        _auth.login(parsedRole, displayName: res['fullName']?.toString());
+        return;
+      }
+    } catch (_) {}
+    // Fallback: mock token for offline/demo
+    await _tokens.setToken(_mockTokenForRole(role));
     await _tokens.setStoredRole(role.name);
     _auth.login(role);
+  }
+
+  Future<Map<String, dynamic>?> _loginWithRoleApi(AppRole role) async {
+    final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+    final r = await dio.post<Map<String, dynamic>>('/api/auth/login-with-role', data: {'role': role.name});
+    final data = r.data;
+    if (data != null && data['success'] == true && data['data'] != null) {
+      return data['data'] as Map<String, dynamic>;
+    }
+    return null;
   }
 
   /// Logout: clear storage and auth state.
@@ -75,11 +121,31 @@ class AuthService {
     _auth.logout();
   }
 
-  /// Mock API call. Replace with real API (e.g. [ApiClient.post] to [ApiEndpoints.login]).
-  Future<Map<String, dynamic>> _loginApi(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    // Demo: accept any and return admin. Replace with real API.
-    return {'token': _mockTokenForRole(AppRole.admin), 'role': 'admin'};
+  /// Login with email + password (optionally idCardNumber). Calls real API.
+  Future<Map<String, dynamic>> _loginApi(String email, String password, {String? idCardNumber}) async {
+    try {
+      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final payload = <String, dynamic>{
+        'email': email.trim(),
+        'password': password,
+      };
+      if (idCardNumber != null && idCardNumber.trim().isNotEmpty) {
+        payload['idCardNumber'] = idCardNumber.trim();
+      }
+      final res = await dio.post<Map<String, dynamic>>('/api/auth/login', data: payload);
+      final data = res.data;
+      if (data == null || data['success'] != true) {
+        throw AuthException((data?['message'] ?? 'Login failed').toString());
+      }
+      final d = data['data'] as Map<String, dynamic>?;
+      if (d == null) throw AuthException('Invalid response');
+      return d;
+    } on DioException catch (e) {
+      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
+          e.message ??
+          'Login failed';
+      throw AuthException(msg);
+    }
   }
 
   String _mockTokenForRole(AppRole role) {

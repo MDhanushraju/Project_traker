@@ -27,6 +27,15 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    private String title;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "position_id")
+    private Position position;
+
+    @Column(name = "is_temporary")
+    private boolean isTemporary = false;
+
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
 
@@ -58,6 +67,12 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public Position getPosition() { return position; }
+    public void setPosition(Position position) { this.position = position; }
+    public boolean isTemporary() { return isTemporary; }
+    public void setTemporary(boolean temporary) { isTemporary = temporary; }
     public Instant getCreatedAt() { return createdAt; }
     public String getPendingOtp() { return pendingOtp; }
     public void setPendingOtp(String pendingOtp) { this.pendingOtp = pendingOtp; }

@@ -11,14 +11,27 @@ if (-not $JavaExe) {
     try { $JavaExe = (Get-Command java -ErrorAction Stop).Source } catch {}
 }
 if (-not $JavaExe) {
-    $paths = @("${env:ProgramFiles}\Java\jdk-17*\bin\java.exe", "${env:ProgramFiles}\Java\jdk-21*\bin\java.exe")
+    # Try exact path first (common JDK 21 install location)
+    $jdk21 = Join-Path ${env:ProgramFiles} "Java\jdk-21\bin\java.exe"
+    if (Test-Path $jdk21) {
+        $JavaExe = $jdk21
+    }
+}
+if (-not $JavaExe) {
+    $paths = @(
+        "${env:ProgramFiles}\Java\jdk-21*\bin\java.exe",
+        "${env:ProgramFiles}\Java\jdk-17*\bin\java.exe",
+        "${env:ProgramFiles}\Eclipse Adoptium\jdk-21*\bin\java.exe",
+        "${env:ProgramFiles}\Eclipse Adoptium\jdk-17*\bin\java.exe",
+        "${env:ProgramFiles}\Microsoft\jdk-21*\bin\java.exe"
+    )
     foreach ($p in $paths) {
         $resolved = Get-Item $p -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($resolved) { $JavaExe = $resolved.FullName; break }
     }
 }
 if (-not $JavaExe -or -not (Test-Path $JavaExe)) {
-    Write-Host "Java not found. Install JDK 17+ (https://adoptium.net/)" -ForegroundColor Red
+    Write-Host "Java not found. Install JDK 21 (https://adoptium.net/) and ensure it is in Program Files\Java\" -ForegroundColor Red
     exit 1
 }
 $env:JAVA_HOME = (Get-Item $JavaExe).Directory.Parent.FullName

@@ -1,10 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
+import '../../../core/auth/auth_exception.dart';
 import 'auth_theme.dart';
 
-/// OTP Verification: enter 4-digit code sent to email.
+/// Captcha verification: solve the math question to continue.
 class ForgotPasswordOtpPage extends StatefulWidget {
   const ForgotPasswordOtpPage({super.key});
 
@@ -13,14 +16,18 @@ class ForgotPasswordOtpPage extends StatefulWidget {
 }
 
 class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
-  final List<TextEditingController> _controllers =
-      List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  final _answerController = TextEditingController();
   bool _isLoading = false;
   bool _canResend = false;
 
-  String get _email =>
-      ModalRoute.of(context)?.settings.arguments as String? ?? '';
+  Map<String, dynamic> get _args {
+    final a = ModalRoute.of(context)?.settings.arguments;
+    if (a is Map) return Map<String, dynamic>.from(a);
+    return {};
+  }
+
+  String get _email => (_args['email'] ?? '').toString();
+  String get _captchaQuestion => (_args['captchaQuestion'] ?? '').toString();
 
   @override
   void initState() {
@@ -32,25 +39,49 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    _answerController.dispose();
     super.dispose();
   }
 
-  String _getCode() =>
-      _controllers.map((c) => c.text).join();
+  String _getAnswer() => _answerController.text.trim();
 
   Future<void> _verify() async {
-    final code = _getCode();
-    if (code.length != 4) return;
+    final answer = _getAnswer();
+    if (answer.isEmpty) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.of(context).pushReplacementNamed(
-      AppRoutes.resetPassword,
-      arguments: _email,
-    );
+    try {
+      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final res = await dio.post<Map<String, dynamic>>(
+        '/api/auth/verify-captcha',
+        data: {'email': _email, 'captchaAnswer': answer},
+      );
+      if (!mounted) return;
+      final data = res.data;
+      if (data == null || data['success'] != true) {
+        throw AuthException((data?['message'] ?? 'Verification failed').toString());
+      }
+      final d = data['data'] as Map<String, dynamic>?;
+      final token = d?['resetToken']?.toString();
+      if (token == null || token.isEmpty) {
+        throw AuthException('No reset token received');
+      }
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.resetPassword,
+        arguments: {'resetToken': token},
+      );
+    } on DioException catch (e) {
+      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
+          e.message ?? 'Verification failed';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _resendCode() async {
@@ -99,6 +130,17 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      if (_captchaQuestion.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _captchaQuestion,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AuthTheme.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       Text(
                         'Verification',
                         style: Theme.of(context)
@@ -111,53 +153,32 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Enter the 4-digit code sent to your email.',
+                        _captchaQuestion.isNotEmpty
+                            ? 'Enter your answer below.'
+                            : 'Enter the verification code.',
                         style: Theme.of(context)
                             .textTheme
                             .bodyLarge
                             ?.copyWith(color: AuthTheme.textSecondary(context)),
                       ),
                       const SizedBox(height: 28),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: List.generate(
-                          4,
-                          (i) => SizedBox(
-                            width: 56,
-                            child: TextFormField(
-                              controller: _controllers[i],
-                              focusNode: _focusNodes[i],
-                              style: TextStyle(
-                                color: AuthTheme.textPrimary(context),
-                                fontSize: 24,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLength: 1,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              onChanged: (v) {
-                                if (v.isNotEmpty && i < 3) {
-                                  _focusNodes[i + 1].requestFocus();
-                                } else if (v.isEmpty && i > 0) {
-                                  _focusNodes[i - 1].requestFocus();
-                                }
-                                if (_getCode().length == 4) {
-                                  _verify();
-                                }
-                              },
-                              decoration: InputDecoration(
-                                hintText: '-',
-                                hintStyle: TextStyle(
-                                  color: AuthTheme.textSecondary(context),
-                                  fontSize: 20,
-                                ),
-                                counterText: '',
-                              ),
-                            ),
-                          ),
+                      TextFormField(
+                        controller: _answerController,
+                        style: TextStyle(
+                          color: AuthTheme.textPrimary(context),
+                          fontSize: 20,
+                        ),
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(3),
+                        ],
+                        onFieldSubmitted: (_) => _verify(),
+                        decoration: InputDecoration(
+                          labelText: 'Your answer',
+                          hintText: 'e.g. 8',
+                          hintStyle: TextStyle(color: AuthTheme.textSecondary(context)),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -185,8 +206,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage> {
                       ),
                       const SizedBox(height: 24),
                       FilledButton(
-                        onPressed: _isLoading ||
-                                _getCode().length != 4
+                        onPressed: _isLoading || _getAnswer().isEmpty
                             ? null
                             : _verify,
                         style: FilledButton.styleFrom(

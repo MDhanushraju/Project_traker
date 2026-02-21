@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/constants/roles.dart';
 import '../../../core/constants/task_status.dart';
+import '../../../data/data_provider.dart';
 import '../../../data/mock_data.dart';
 import '../users/user_details_page.dart';
 import '../../../shared/animations/fade_in.dart';
@@ -11,9 +12,35 @@ import '../../app/app_routes.dart';
 import 'widgets/project_status_card.dart';
 
 /// Dashboard screen. Stats, active projects, upcoming tasks, quick actions.
-/// For admins, shows Admin Hub (PROJECT OVERVIEW, Assign Project, Recent Assignments).
-class DashboardPage extends StatelessWidget {
+/// Loads data from API on init.
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    MockData.refreshFromApi().then((_) {
+      if (!mounted) return;
+      setState(() {});
+      if (MockData.lastError != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Could not load data: ${MockData.lastError}'),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +48,23 @@ class DashboardPage extends StatelessWidget {
     if (user == null) {
       return const Scaffold(
         body: Center(child: Text('Not logged in')),
+      );
+    }
+
+    if (MockData.isLoading) {
+      return MainLayout(
+        title: 'Dashboard',
+        currentRoute: AppRoutes.dashboard,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading...'),
+            ],
+          ),
+        ),
       );
     }
 
@@ -57,7 +101,6 @@ class DashboardPage extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
-    final projects = MockData.projects;
 
     return MainLayout(
       title: 'Dashboard',
@@ -129,7 +172,7 @@ class DashboardPage extends StatelessWidget {
             onSeeAll: () => Navigator.of(context).pushNamed(AppRoutes.projects),
           ),
           const SizedBox(height: 12),
-          if (projects.isEmpty)
+          if (MockData.projects.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
@@ -140,7 +183,7 @@ class DashboardPage extends StatelessWidget {
               ),
             )
           else
-            ...projects.take(4).map(
+            ...MockData.projects.take(4).map(
                   (p) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: ProjectStatusCard(

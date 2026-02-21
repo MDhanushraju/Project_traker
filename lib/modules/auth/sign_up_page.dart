@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/roles.dart';
 import '../../../core/auth/auth_service.dart';
-import '../../../core/auth/role_access.dart';
+import '../../../data/positions_data.dart';
+import '../../../core/auth/auth_exception.dart';
 import '../../../app/app_routes.dart';
 import 'auth_theme.dart';
 
@@ -26,6 +27,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   AppRole _selectedRole = AppRole.member;
+  String? _selectedPosition; // Developer, Tester, etc. - for team member/leader
 
   @override
   void dispose() {
@@ -37,26 +39,43 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
+  bool get _needsPosition =>
+      _selectedRole == AppRole.member || _selectedRole == AppRole.teamLeader;
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_needsPosition && (_selectedPosition == null || _selectedPosition!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your team (Developer, Tester, etc.)')),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
-    await AuthService.instance.signUp(
-      fullName: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      idCardNumber: _idCardController.text.trim().isEmpty
-          ? null
-          : _idCardController.text.trim(),
-      role: _selectedRole,
-    );
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    final r = AuthService.instance.role;
-    if (r != null) {
-      final route = RoleAccess.defaultRouteForRole(r);
-      Navigator.of(context).pushReplacementNamed(route);
+    try {
+      await AuthService.instance.signUp(
+        fullName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        confirmPassword: _confirmPasswordController.text,
+        idCardNumber: _idCardController.text.trim().isEmpty
+            ? null
+            : _idCardController.text.trim(),
+        role: _selectedRole,
+        position: _needsPosition ? _selectedPosition : null,
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created. Please log in.')),
+      );
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     }
   }
 
@@ -135,8 +154,15 @@ class _SignUpPageState extends State<SignUpPage> {
                           controller: _passwordController,
                           obscure: _obscurePassword,
                           onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
-                          validator: (v) =>
-                              (v == null || v.isEmpty) ? 'Required' : null,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            if (v.length < 8) return 'At least 8 characters';
+                            if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include one number';
+                            if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(v)) {
+                              return 'Include one special character (!@#\$%^&* etc.)';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         _buildPasswordField(
@@ -180,9 +206,48 @@ class _SignUpPageState extends State<SignUpPage> {
                               )
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) setState(() => _selectedRole = v);
+                            if (v != null) setState(() {
+                              _selectedRole = v;
+                              if (!_needsPosition) _selectedPosition = null;
+                            });
                           },
                         ),
+                        if (_needsPosition) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Which team are you in?',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: AuthTheme.textPrimary(context),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _selectedPosition,
+                            dropdownColor: AuthTheme.cardBackground(context),
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                            ),
+                            hint: Text(
+                              'Select team (Developer, Tester, etc.)',
+                              style: TextStyle(color: AuthTheme.textSecondary(context)),
+                            ),
+                            items: PositionsData.instance.positions
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p,
+                                    child: Text(
+                                      p,
+                                      style: TextStyle(color: AuthTheme.textPrimary(context)),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              setState(() => _selectedPosition = v);
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _buildTermsText(),
                         const SizedBox(height: 24),

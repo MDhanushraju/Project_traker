@@ -1,129 +1,88 @@
 import '../modules/projects/models/project_model.dart';
 import '../modules/tasks/models/task_model.dart';
+import 'api_repository.dart';
 
-/// Mock data for UI. Replace with API later.
+/// Data for UI. Loads from API; falls back to empty when offline.
 class MockData {
   MockData._();
 
-  static List<ProjectModel> get projects => [
-        const ProjectModel(
-          id: '1',
-          name: 'Website Redesign',
-          status: 'Active',
-          progress: 65,
-        ),
-        const ProjectModel(
-          id: '2',
-          name: 'Mobile App',
-          status: 'Active',
-          progress: 30,
-        ),
-        const ProjectModel(
-          id: '3',
-          name: 'API Integration',
-          status: 'On hold',
-          progress: 10,
-        ),
-        const ProjectModel(
-          id: '4',
-          name: 'Bug Fix - Login Flow',
-          status: 'Active',
-          progress: 45,
-        ),
-        const ProjectModel(
-          id: '5',
-          name: 'UI Color Theme Update',
-          status: 'Active',
-          progress: 80,
-        ),
-        const ProjectModel(
-          id: '6',
-          name: 'Dashboard Performance',
-          status: 'In Progress',
-          progress: 55,
-        ),
-      ];
+  static List<ProjectModel>? _projectsCache;
+  static List<TaskModel>? _tasksCache;
+  static List<String>? _teamLeaderProjectsCache;
+  static Map<String, List<Map<String, dynamic>>>? _teamLeaderMembersCache;
+  static Map<String, String>? _teamManagerCache;
+  static List<String>? _memberProjectsCache;
+  static List<Map<String, String>>? _memberContactsCache;
+  static int? _overdueCountCache;
+  static bool _isLoading = false;
+  static String? _lastError;
 
-  static List<TaskModel> get tasks => [
-        const TaskModel(
-          id: '1',
-          title: 'Review wireframes',
-          status: 'in_progress',
-          dueDate: '2025-02-20',
-        ),
-        const TaskModel(
-          id: '2',
-          title: 'Setup dev environment',
-          status: 'done',
-          dueDate: '2025-02-15',
-        ),
-        const TaskModel(
-          id: '3',
-          title: 'Design system audit',
-          status: 'todo',
-          dueDate: '2025-02-25',
-        ),
-        const TaskModel(
-          id: '4',
-          title: 'User testing session',
-          status: 'todo',
-          dueDate: '2025-03-01',
-        ),
-        const TaskModel(
-          id: '5',
-          title: 'Deploy staging',
-          status: 'in_progress',
-          dueDate: '2025-02-22',
-        ),
-        const TaskModel(
-          id: '6',
-          title: 'API documentation',
-          status: 'yet_to_start',
-          dueDate: '2025-03-05',
-        ),
-        const TaskModel(
-          id: '7',
-          title: 'Security review',
-          status: 'yet_to_start',
-          dueDate: '2025-03-10',
-        ),
-      ];
+  static final _api = ApiRepository.instance;
 
-  static List<String> get upcomingTaskTitles =>
-      tasks.take(3).map((t) => t.title ?? '').toList();
+  static bool get isLoading => _isLoading;
+  static String? get lastError => _lastError;
 
+  /// Call to load from API. Triggers rebuild of consumers when done.
+  static Future<void> refreshFromApi() async {
+    _isLoading = true;
+    _lastError = null;
+    try {
+      _projectsCache = await _api.getProjects();
+      _tasksCache = await _api.getTasks();
+      _teamLeaderProjectsCache = await _api.getTeamLeaderProjects();
+      _teamLeaderMembersCache = await _api.getTeamLeaderTeamMembers();
+      _teamManagerCache = await _api.getTeamManager();
+      _memberProjectsCache = await _api.getMemberProjects();
+      _memberContactsCache = await _api.getMemberContacts();
+      _overdueCountCache = null;
+      final now = DateTime.now();
+      _overdueCountCache = (_tasksCache ?? []).where((t) {
+        final d = t.dueDate;
+        if (d == null || d.isEmpty) return false;
+        try {
+          return DateTime.parse(d).isBefore(now) && (t.status ?? '') != 'done';
+        } catch (_) {
+          return false;
+        }
+      }).length;
+    } catch (e) {
+      _lastError = e.toString().replaceAll('Exception:', '').trim();
+    } finally {
+      _isLoading = false;
+    }
+  }
+
+  static List<ProjectModel> get projects => _projectsCache ?? [];
+  static List<TaskModel> get tasks => _tasksCache ?? [];
+  static List<String> get upcomingTaskTitles => tasks.take(3).map((t) => t.title ?? '').toList();
   static int get projectCount => projects.length;
   static int get taskCount => tasks.length;
-  static int get overdueCount => 1;
+  static int get overdueCount => _overdueCountCache ?? 0;
 
-  /// Mock: projects assigned to the current Team Leader. Replace with API.
   static List<String> get teamLeaderAssignedProjects =>
-      ['API Integration', 'Website Redesign'];
+      _teamLeaderProjectsCache ?? ['API Integration', 'Website Redesign'];
 
-  /// Mock: team members under Team Leader per project. Replace with API.
-  static Map<String, List<Map<String, String>>> get teamLeaderTeamMembers => {
+  static Map<String, List<Map<String, dynamic>>> get teamLeaderTeamMembers =>
+      _teamLeaderMembersCache ?? {
         'API Integration': [
-          {'name': 'David Chen', 'title': 'Lead Developer', 'position': 'Developer'},
-          {'name': 'James Wilson', 'title': 'Backend Architect', 'position': 'Developer'},
+          {'id': 0, 'name': 'David Chen', 'title': 'Lead Developer', 'position': 'Developer'},
+          {'id': 0, 'name': 'James Wilson', 'title': 'Backend Architect', 'position': 'Developer'},
         ],
         'Website Redesign': [
-          {'name': 'David Chen', 'title': 'Lead Developer', 'position': 'Developer'},
-          {'name': 'Maya Patel', 'title': 'Content Strategist', 'position': 'Analyst'},
-          {'name': 'John Doe', 'title': 'Developer', 'position': 'Developer'},
+          {'id': 0, 'name': 'David Chen', 'title': 'Lead Developer', 'position': 'Developer'},
+          {'id': 0, 'name': 'Maya Patel', 'title': 'Content Strategist', 'position': 'Analyst'},
+          {'id': 0, 'name': 'John Doe', 'title': 'Developer', 'position': 'Developer'},
         ],
       };
 
-  /// Mock: Team Manager for Team Leader to contact. Replace with API.
-  static Map<String, String> get teamManager => {
-        'name': 'Sarah Jenkins',
-        'title': 'Director of Product Operations',
-      };
+  static Map<String, String> get teamManager =>
+      _teamManagerCache ?? {'name': 'Sarah Jenkins', 'title': 'Director of Product Operations'};
 
-  /// Mock: projects assigned to current Team Member. Replace with API.
-  static List<String> get memberAssignedProjects => ['API Integration', 'Website Redesign'];
+  static List<String> get memberAssignedProjects =>
+      _memberProjectsCache ?? ['API Integration', 'Website Redesign'];
 
-  /// Mock: Team Member contacts - Team Leader, Manager, other members. Replace with API.
-  static List<Map<String, String>> get memberContacts => [
+  static List<Map<String, String>> get memberContacts =>
+      _memberContactsCache ?? [
         {'name': 'Marcus Thorne', 'title': 'Tech Lead', 'type': 'Team Leader'},
         {'name': 'Sarah Jenkins', 'title': 'Director of Product Operations', 'type': 'Manager'},
         {'name': 'David Chen', 'title': 'Lead Developer', 'type': 'Team Member'},

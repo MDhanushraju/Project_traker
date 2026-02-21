@@ -6,6 +6,7 @@ import com.taker.auth.entity.Role;
 import com.taker.auth.entity.User;
 import com.taker.auth.exception.AuthException;
 import com.taker.auth.exception.UnauthorizedException;
+import com.taker.auth.repository.PositionRepository;
 import com.taker.auth.repository.UserRepository;
 import com.taker.auth.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,23 +17,33 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final PositionRepository positionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(UserRepository userRepository,
+                       PositionRepository positionRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.userRepository = userRepository;
+        this.positionRepository = positionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
     public AuthResponse login(LoginRequest req) {
-        User user = userRepository.findByEmailAndIdCardNumber(req.getEmail().trim(), req.getIdCardNumber().trim())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or ID Card Number"));
-
+        User user;
+        String email = req.getEmail().trim();
+        String idCard = req.getIdCardNumber() != null ? req.getIdCardNumber().trim() : "";
+        if (!idCard.isBlank()) {
+            user = userRepository.findByEmailAndIdCardNumber(email, idCard)
+                    .orElseThrow(() -> new UnauthorizedException("Invalid email or ID Card Number"));
+        } else {
+            user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+        }
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            throw new UnauthorizedException("Invalid password");
+            throw new UnauthorizedException("Invalid email or password");
         }
 
         String roleName = user.getRole().name().toLowerCase();
@@ -60,6 +71,10 @@ public class AuthService {
                 passwordEncoder.encode(req.getPassword()),
                 role
         );
+        if (req.getPosition() != null && !req.getPosition().isBlank()) {
+            positionRepository.findByName(req.getPosition().trim())
+                    .ifPresent(user::setPosition);
+        }
         user = userRepository.save(user);
 
         String roleName = user.getRole().name().toLowerCase();
@@ -67,17 +82,33 @@ public class AuthService {
         return new AuthResponse(token, roleName, user.getEmail(), user.getFullName());
     }
 
-    private Role parseRole(String role) {
+    public Role parseRole(String role) {
         if (role == null || role.isBlank()) return Role.MEMBER;
-        String r = role.trim().toLowerCase();
+        String r = role.trim().toLowerCase().replace(" ", "_").replace("teamleader", "team_leader");
         return switch (r) {
             case "admin" -> Role.ADMIN;
             case "manager" -> Role.MANAGER;
+            case "team_leader" -> Role.TEAM_LEADER;
             default -> Role.MEMBER;
         };
     }
 
+    public AuthResponse loginWithRole(String roleStr) {
+        Role role = parseRole(roleStr);
+        User user = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == role)
+                .findFirst()
+                .orElseThrow(() -> new AuthException("No user found for role: " + roleStr));
+        String roleName = user.getRole().name().toLowerCase();
+        String token = jwtService.generateToken(user.getEmail(), roleName);
+        return new AuthResponse(token, roleName, user.getEmail(), user.getFullName());
+    }
+
     private boolean isValidPassword(String password) {
+        return isValidPasswordStatic(password);
+    }
+
+    public static boolean isValidPasswordStatic(String password) {
         return password != null
                 && password.length() >= 8
                 && password.matches(".*[0-9].*")

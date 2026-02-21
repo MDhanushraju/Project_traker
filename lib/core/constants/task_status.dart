@@ -2,20 +2,29 @@
 class TaskStatus {
   TaskStatus._();
 
-  static const String yetToStart = 'yet_to_start';
-  static const String todo = 'todo';
-  static const String inProgress = 'in_progress';
-  static const String done = 'done';
+  static const String needToStart = 'need_to_start';
+  static const String ongoing = 'ongoing';
+  static const String completed = 'completed';
+
+  // Legacy aliases
+  static const String yetToStart = 'need_to_start';
+  static const String todo = 'need_to_start';
+  static const String inProgress = 'ongoing';
+  static const String done = 'completed';
+
+  static const List<String> all = [needToStart, ongoing, completed];
 
   /// Display label for each status.
   static String label(String status) {
     switch (status) {
+      case needToStart:
       case yetToStart:
-        return 'Yet to Start';
       case todo:
-        return 'Todo';
+        return 'Need to Start';
+      case ongoing:
       case inProgress:
         return 'Ongoing';
+      case completed:
       case done:
         return 'Completed';
       default:

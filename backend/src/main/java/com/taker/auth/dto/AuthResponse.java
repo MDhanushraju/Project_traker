@@ -1,10 +1,20 @@
 package com.taker.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Auth response with JWT token and user info")
 public class AuthResponse {
 
+    @Schema(description = "JWT token - use in Authorization: Bearer <token>", example = "eyJhbGciOiJIUzI1NiJ9...")
     private String token;
+
+    @Schema(description = "User role", example = "admin")
     private String role;
+
+    @Schema(description = "User email", example = "admin@taker.com")
     private String email;
+
+    @Schema(description = "User full name", example = "Admin User")
     private String fullName;
 
     public AuthResponse() {}

@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
-import 'auth_theme.dart';
+import '../../../core/auth/auth_exception.dart';
 import 'auth_theme.dart';
 
 /// Forgot Password: enter email to receive 4-digit verification code.
@@ -26,13 +28,42 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Future<void> _sendCode() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.of(context).pushNamed(
-      AppRoutes.forgotPasswordOtp,
-      arguments: _emailController.text.trim(),
-    );
+    try {
+      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final res = await dio.post<Map<String, dynamic>>(
+        '/api/auth/forgot-password',
+        data: {'email': _emailController.text.trim().toLowerCase()},
+      );
+      if (!mounted) return;
+      final data = res.data;
+      if (data == null || data['success'] != true) {
+        throw AuthException((data?['message'] ?? 'Request failed').toString());
+      }
+      final d = data['data'] as Map<String, dynamic>?;
+      final captcha = d?['captchaQuestion']?.toString();
+      if (captcha == null || captcha.isEmpty) {
+        throw AuthException('No captcha received');
+      }
+      Navigator.of(context).pushNamed(
+        AppRoutes.forgotPasswordOtp,
+        arguments: {
+          'email': _emailController.text.trim().toLowerCase(),
+          'captchaQuestion': captcha,
+        },
+      );
+    } on DioException catch (e) {
+      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
+          e.message ?? 'Request failed';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

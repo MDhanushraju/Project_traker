@@ -3,16 +3,22 @@ import 'package:flutter/material.dart';
 import '../models/task_model.dart';
 import '../../../../core/constants/task_status.dart';
 
-/// Card for a single task. Uses theme. Shows due date when available.
+/// Card for a single task. Uses theme. Shows status dropdown, delete, due date.
 class TaskCard extends StatelessWidget {
   const TaskCard({
     super.key,
     required this.task,
     this.onTap,
+    this.onStatusChange,
+    this.onDelete,
+    this.canEdit = false,
   });
 
   final TaskModel task;
   final VoidCallback? onTap;
+  final void Function(String status)? onStatusChange;
+  final VoidCallback? onDelete;
+  final bool canEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +58,13 @@ class TaskCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        _StatusChip(status: status),
+                        if (canEdit && onStatusChange != null)
+                          _StatusDropdown(
+                            value: status,
+                            onChanged: onStatusChange!,
+                          )
+                        else
+                          _StatusChip(status: status),
                         if (dueDate != null && dueDate.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           Icon(
@@ -73,11 +85,18 @@ class TaskCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              if (canEdit && onDelete != null)
+                IconButton(
+                  icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error, size: 22),
+                  onPressed: onDelete,
+                  tooltip: 'Delete',
+                )
+              else
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
         ),
@@ -96,24 +115,57 @@ class _StatusIndicator extends StatelessWidget {
     final theme = Theme.of(context);
     Color color;
     IconData icon;
-    switch (status) {
-      case TaskStatus.done:
-        color = Colors.green;
-        icon = Icons.check_circle_rounded;
-        break;
-      case TaskStatus.inProgress:
-        color = theme.colorScheme.tertiary;
-        icon = Icons.pending_rounded;
-        break;
-      case TaskStatus.yetToStart:
-        color = theme.colorScheme.outline;
-        icon = Icons.schedule_rounded;
-        break;
-      default:
-        color = theme.colorScheme.outline;
-        icon = Icons.radio_button_unchecked_rounded;
+    if (status == TaskStatus.completed || status == TaskStatus.done || status == 'done') {
+      color = Colors.green;
+      icon = Icons.check_circle_rounded;
+    } else if (status == TaskStatus.ongoing || status == TaskStatus.inProgress || status == 'in_progress') {
+      color = theme.colorScheme.tertiary;
+      icon = Icons.pending_rounded;
+    } else {
+      color = theme.colorScheme.outline;
+      icon = Icons.schedule_rounded;
     }
     return Icon(icon, color: color, size: 24);
+  }
+}
+
+String _normalizeStatus(String s) {
+  if (TaskStatus.all.contains(s)) return s;
+  if (s == TaskStatus.inProgress || s == 'in_progress') return TaskStatus.ongoing;
+  if (s == TaskStatus.done || s == 'done') return TaskStatus.completed;
+  return TaskStatus.needToStart;
+}
+
+class _StatusDropdown extends StatelessWidget {
+  const _StatusDropdown({required this.value, required this.onChanged});
+
+  final String value;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _normalizeStatus(value),
+          isDense: true,
+          iconSize: 18,
+          items: TaskStatus.all.map((s) => DropdownMenuItem(
+            value: s,
+            child: Text(TaskStatus.label(s), style: theme.textTheme.labelSmall),
+          )).toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
   }
 }
 

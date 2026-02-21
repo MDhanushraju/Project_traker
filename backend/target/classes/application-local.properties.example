@@ -1,6 +1,0 @@
-# Copy to application-local.properties and adjust for your PostgreSQL setup.
-# application-local.properties is gitignored; use for local overrides.
-
-# spring.datasource.url=jdbc:postgresql://localhost:5432/takerdb
-# spring.datasource.username=postgres
-# spring.datasource.password=your_password
