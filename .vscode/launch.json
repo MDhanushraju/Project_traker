@@ -5,12 +5,14 @@
       "name": "Flutter (Chrome)",
       "request": "launch",
       "type": "dart",
+      "cwd": "${workspaceFolder}/frontend",
       "args": ["-d", "chrome", "--web-renderer", "html"]
     },
     {
       "name": "Flutter (Chrome - CanvasKit)",
       "request": "launch",
       "type": "dart",
+      "cwd": "${workspaceFolder}/frontend",
       "args": ["-d", "chrome"]
     }
   ]

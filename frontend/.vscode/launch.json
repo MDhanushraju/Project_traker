@@ -1,0 +1,8 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {"name": "Flutter (Chrome)", "request": "launch", "type": "dart", "cwd": "${workspaceFolder}", "args": ["-d", "chrome", "--web-renderer", "html"]},
+    {"name": "Flutter (Chrome - CanvasKit)", "request": "launch", "type": "dart", "cwd": "${workspaceFolder}", "args": ["-d", "chrome"]},
+    {"name": "Flutter (Windows)", "request": "launch", "type": "dart", "cwd": "${workspaceFolder}", "args": ["-d", "windows"]}
+  ]
+}
