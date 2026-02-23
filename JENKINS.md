@@ -7,21 +7,21 @@
 - Two SonarQube projects: `project-tracker-backend`, `project-tracker-frontend` (each with a token)
 - Jenkins credentials: `sonar-backend-token`, `sonar-frontend-token` (Secret text)
 
-## Project Structure
+## Three-Repo Setup
 
-```
-project-root/
-├── backend/     (Spring Boot)
-├── frontend/    (Flutter, has sonar-project.properties)
-└── Jenkinsfile
-```
+| Repo | Jenkinsfile Path | Jenkins Job |
+|------|------------------|-------------|
+| **All** (monorepo) | `Jenkinsfile` (root) | Both backend + frontend |
+| **Backend only** | `backend/Jenkinsfile` | Backend SonarQube |
+| **Frontend only** | `frontend/Jenkinsfile` | Frontend SonarQube |
 
-## Jenkins Job
+## Jenkins Jobs
 
-- **Type:** Pipeline
-- **Definition:** Pipeline script from SCM
-- **SCM:** Git
-- **Script Path:** Jenkinsfile
+Create 3 pipeline jobs (or 1 if you use only the monorepo):
+
+- **project-tracker-all** → Repo with backend + frontend, Script Path: `Jenkinsfile`
+- **project-tracker-backend** → Backend-only repo, Script Path: `Jenkinsfile` (root of that repo)
+- **project-tracker-frontend** → Frontend-only repo, Script Path: `Jenkinsfile` (root of that repo)
 
 ## Windows Jenkins Agent
 

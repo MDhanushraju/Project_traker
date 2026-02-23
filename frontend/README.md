@@ -14,13 +14,25 @@ Flutter UI for the Project Tracker app. Connects to backend at `http://localhost
 | Linux | `flutter run -d linux` |
 | macOS | `flutter run -d macos` |
 
+## Build APK
+
+```powershell
+flutter build apk --release
+```
+
+APK output: `build/app/outputs/flutter-apk/app-release.apk`. See `docs/BUILD_APK.md`.
+
+## API Schema
+
+See `docs/API_SCHEMA.md` for endpoints and links to backend Swagger/OpenAPI.
+
 ## Structure
 
 ```
 frontend/
 ├── lib/              # Dart source
 ├── test/
-├── docs/             # PROJECT_OVERVIEW.md
+├── docs/             # PROJECT_OVERVIEW.md, API_SCHEMA.md
 ├── android/ ios/ web/ windows/ linux/ macos/
 ├── run-frontend.ps1  # Start script
 └── pubspec.yaml
