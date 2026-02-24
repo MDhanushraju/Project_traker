@@ -31,13 +31,13 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 $env:SONAR_HOST_URL = "http://localhost:9000"
 $env:SONAR_TOKEN = "your-sonarqube-token"
 
-.\.mvn\maven\bin\mvn.cmd clean verify sonar:sonar
+.\gradlew.bat clean build sonar
 ```
 
 Or create a token in SonarQube and pass it directly:
 
 ```powershell
-.\.mvn\maven\bin\mvn.cmd sonar:sonar -Dsonar.token=YOUR_TOKEN -Dsonar.host.url=http://localhost:9000
+.\gradlew.bat sonar -Dsonar.token=YOUR_TOKEN -Dsonar.host.url=http://localhost:9000
 ```
 
 ## 4. Create Project in SonarQube (First Time)
@@ -58,7 +58,7 @@ sonar.projectName=Project Tracker Backend
 sonar.host.url=http://localhost:9000
 sonar.sources=src/main/java
 sonar.tests=src/test/java
-sonar.java.binaries=target/classes
+sonar.java.binaries=build/classes/java/main
 sonar.exclusions=**/config/**,**/dto/**
 ```
 
@@ -80,5 +80,5 @@ For Flutter analysis in SonarQube:
 
 | Task | Command |
 |------|---------|
-| Run analysis (backend) | `cd backend; mvn sonar:sonar -Dsonar.token=TOKEN -Dsonar.host.url=http://localhost:9000` |
-| Run with defaults | Ensure `SONAR_HOST_URL` and `SONAR_TOKEN` env vars are set, then `mvn sonar:sonar` |
+| Run analysis (backend) | `cd backend; .\gradlew.bat sonar -Dsonar.token=TOKEN -Dsonar.host.url=http://localhost:9000` |
+| Run with defaults | Ensure `SONAR_HOST_URL` and `SONAR_TOKEN` env vars are set, then `.\gradlew.bat sonar` |

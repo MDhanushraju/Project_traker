@@ -1,24 +1,21 @@
 server:
-  port: 8080
+  port: ${PORT:10000}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/project_tracker
-    username: postgres
-    password: Dhanush@03
+    url: ${DATABASE_URL}
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
 
 jwt:
-  secret: your-256-bit-secret-key-for-taker-auth-backend-min-32-chars
+  secret: ${JWT_SECRET}
   expiration-ms: 86400000
   reset-expiration-ms: 900000
 
@@ -40,5 +37,3 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha

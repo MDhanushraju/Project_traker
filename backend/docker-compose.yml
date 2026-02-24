@@ -1,0 +1,37 @@
+# Backend + PostgreSQL — run from backend/
+# Usage: docker compose up -d
+# API: http://localhost:8080   Swagger: http://localhost:8080/swagger-ui.html
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: project-tracker-db
+    environment:
+      POSTGRES_DB: project_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Dhanush@03
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: project-tracker-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/project_tracker
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: Dhanush@03
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

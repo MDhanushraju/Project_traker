@@ -1,0 +1,26 @@
+# Build output
+build/
+!build/libs/*.jar
+
+# Gradle (keep gradle/wrapper for Docker build)
+.gradle/
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docs / scripts (not needed in image)
+docs/
+*.md
+*.ps1
+Jenkinsfile
+
+# Test / local
+target/
+.mvn/

@@ -1,4 +1,4 @@
-# Run Spring Boot backend with Maven
+# Run Spring Boot backend with Gradle
 $ErrorActionPreference = "Stop"
 $ProjectDir = $PSScriptRoot
 
@@ -11,18 +11,14 @@ if (-not $JavaExe) {
     try { $JavaExe = (Get-Command java -ErrorAction Stop).Source } catch {}
 }
 if (-not $JavaExe) {
-    # Try exact path first (common JDK 21 install location)
     $jdk21 = Join-Path ${env:ProgramFiles} "Java\jdk-21\bin\java.exe"
-    if (Test-Path $jdk21) {
-        $JavaExe = $jdk21
-    }
+    if (Test-Path $jdk21) { $JavaExe = $jdk21 }
 }
 if (-not $JavaExe) {
     $paths = @(
         "${env:ProgramFiles}\Java\jdk-21*\bin\java.exe",
         "${env:ProgramFiles}\Java\jdk-17*\bin\java.exe",
         "${env:ProgramFiles}\Eclipse Adoptium\jdk-21*\bin\java.exe",
-        "${env:ProgramFiles}\Eclipse Adoptium\jdk-17*\bin\java.exe",
         "${env:ProgramFiles}\Microsoft\jdk-21*\bin\java.exe"
     )
     foreach ($p in $paths) {
@@ -31,21 +27,19 @@ if (-not $JavaExe) {
     }
 }
 if (-not $JavaExe -or -not (Test-Path $JavaExe)) {
-    Write-Host "Java not found. Install JDK 21 (https://adoptium.net/) and ensure it is in Program Files\Java\" -ForegroundColor Red
+    Write-Host "Java not found. Install JDK 21 and ensure it is in PATH or Program Files\Java\" -ForegroundColor Red
     exit 1
 }
 $env:JAVA_HOME = (Get-Item $JavaExe).Directory.Parent.FullName
 Write-Host "Using Java: $JavaExe"
 
-# Maven: PATH or .mvn/maven
-$MvnCmd = $null
-if (Get-Command mvn -ErrorAction SilentlyContinue) { $MvnCmd = "mvn" }
-if (-not $MvnCmd) {
-    $mvnPath = Join-Path $ProjectDir ".mvn\maven\bin\mvn.cmd"
-    if (Test-Path $mvnPath) { $MvnCmd = $mvnPath }
-}
-if (-not $MvnCmd) {
-    Write-Host "Maven not found. Install Maven or run: mvn -N io.takari:maven:wrapper -Dmaven=3.9.6" -ForegroundColor Red
+# Gradle: wrapper first, then system
+$GradleCmd = $null
+$gradlew = Join-Path $ProjectDir "gradlew.bat"
+if (Test-Path $gradlew) { $GradleCmd = $gradlew }
+if (-not $GradleCmd -and (Get-Command gradle -ErrorAction SilentlyContinue)) { $GradleCmd = "gradle" }
+if (-not $GradleCmd) {
+    Write-Host "Gradle not found. Use the Gradle wrapper (gradlew.bat) or install Gradle." -ForegroundColor Red
     exit 1
 }
 
@@ -57,5 +51,5 @@ if ($port) {
 }
 
 Set-Location $ProjectDir
-Write-Host "Running: $MvnCmd spring-boot:run" -ForegroundColor Cyan
-& $MvnCmd spring-boot:run @args
+Write-Host "Running: $GradleCmd bootRun" -ForegroundColor Cyan
+& $GradleCmd bootRun @args

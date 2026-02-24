@@ -1,14 +1,14 @@
-# Generate HTML unit test report (backend)
+# Generate HTML unit test report (backend) — Gradle
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$mvn = ".\.mvn\maven\bin\mvn.cmd"
-if (-not (Test-Path $mvn)) { $mvn = "mvn" }
+$gradlew = ".\gradlew.bat"
+if (-not (Test-Path $gradlew)) { $gradlew = "gradle" }
 
-& $mvn clean test surefire-report:report-only
+& $gradlew clean test
 
 if ($LASTEXITCODE -eq 0) {
-    $report = "target\site\surefire-report.html"
+    $report = "build\reports\tests\test\index.html"
     if (Test-Path $report) {
         $fullPath = (Resolve-Path $report).Path
         Write-Host "JUnit HTML report: $fullPath" -ForegroundColor Green

@@ -17,7 +17,7 @@ cd d:\Project_traker\backend
 ```
 
 **Open HTML:**  
-`backend\target\site\surefire-report.html`
+`backend\build\reports\tests\test\index.html`
 
 Shows: test count, pass/fail, duration, and per-class results.
 
@@ -28,7 +28,7 @@ Shows: test count, pass/fail, duration, and per-class results.
 **Run analysis (after SonarQube is set up):**
 ```powershell
 cd d:\Project_traker\backend
-.\.mvn\maven\bin\mvn.cmd clean verify sonar:sonar -Dsonar.projectKey=project-tracker-backend -Dsonar.host.url=http://localhost:9000 -Dsonar.token=YOUR_TOKEN
+.\gradlew.bat clean build sonar -Dsonar.projectKey=project-tracker-backend -Dsonar.host.url=http://localhost:9000 -Dsonar.token=YOUR_TOKEN
 ```
 
 **Open HTML (SonarQube is the report – no separate .html file):**  
@@ -52,7 +52,7 @@ Shows: all REST endpoints, try-it-out, request/response schemas (HTML in browser
 
 | What | URL or path |
 |------|-------------|
-| JUnit HTML | `backend\target\site\surefire-report.html` (after `.\generate-test-report.ps1`) |
+| JUnit HTML | `backend\build\reports\tests\test\index.html` (after `.\generate-test-report.ps1`) |
 | SAST HTML | http://localhost:9000 |
 | API HTML | http://localhost:8080/swagger-ui.html |
 

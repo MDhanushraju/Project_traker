@@ -1,6 +1,6 @@
 # Postman – Taker Auth API
 
-**Run backend:** `mvn spring-boot:run` or `.\run-backend.ps1`  
+**Run backend:** `.\gradlew.bat bootRun` or `.\run-backend.ps1`  
 **Base URL:** `http://localhost:8080`
 
 ---

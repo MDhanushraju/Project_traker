@@ -12,9 +12,9 @@ The script runs tests and opens **surefire-report.html** in your default browser
 **2. Or generate only (open HTML yourself):**
 ```powershell
 cd d:\Project_traker\backend
-.\.mvn\maven\bin\mvn.cmd clean test surefire-report:report-only
+.\gradlew.bat clean test
 ```
-Then open in browser: **`d:\Project_traker\backend\target\site\surefire-report.html`**
+Then open in browser: **`d:\Project_traker\backend\build\reports\tests\test\index.html`**
 
 ## What you see in the HTML
 

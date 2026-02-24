@@ -3,34 +3,35 @@ pipeline {
 
     tools {
         jdk 'jdk-21'
-        maven 'maven'
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/MDhanushraju/Project-traker-backend.git',
+                    credentialsId: 'github-token'
             }
         }
 
-        stage('Build & Test') {
+        stage('Build') {
             steps {
-                bat 'mvn clean test'
+                bat 'gradlew clean build -x test'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar') {
-                    bat 'mvn sonar:sonar'
+                withSonarQubeEnv('SonarQube') {
+                    bat 'gradlew sonar'
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
