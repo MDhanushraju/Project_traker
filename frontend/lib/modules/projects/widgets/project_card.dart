@@ -4,10 +4,20 @@ import '../models/project_model.dart';
 
 Color _statusColor(String status, ThemeData theme) {
   final s = status.toUpperCase();
-  if (s.contains('PRIORITY') || s.contains('ACTIVE')) return theme.colorScheme.primary;
+  if (s.contains('PRIORITY') || s.contains('ACTIVE') || s.contains('ONGOING')) return theme.colorScheme.primary;
   if (s.contains('COMPLETED') || s.contains('DONE')) return Colors.green;
-  if (s.contains('REVIEW') || s.contains('ON HOLD')) return Colors.orange;
+  if (s.contains('REVIEW') || s.contains('ON HOLD') || s.contains('YET')) return Colors.orange;
   return theme.colorScheme.onSurfaceVariant;
+}
+
+String _statusLabel(String status) {
+  if (status.isEmpty) return status;
+  final s = status.toUpperCase();
+  if (s.contains('ACTIVE') || s.contains('ONGOING')) return 'Ongoing';
+  if (s.contains('START') && !s.contains('YET')) return 'Started';
+  if (s.contains('ON HOLD') || s.contains('YET')) return 'Yet to start';
+  if (s.contains('COMPLETED') || s.contains('DONE')) return 'Completed';
+  return status;
 }
 
 /// Card for a single project. Uses theme. Shows progress when available.
@@ -121,7 +131,7 @@ class ProjectCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            status.toUpperCase(),
+                            _statusLabel(status).toUpperCase(),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: _statusColor(status, theme),
                               fontWeight: FontWeight.w600,

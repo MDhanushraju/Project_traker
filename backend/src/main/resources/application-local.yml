@@ -1,0 +1,10 @@
+# ========== Local server + pgAdmin ==========
+# Use this profile when running backend against local PostgreSQL (e.g. pgAdmin).
+# Do NOT set DATABASE_URL when using local; this file supplies username/password.
+# Create backend/.env.local with DATABASE_PASSWORD=your_pg_password (see .env.local.example).
+#
+# Only overrides if DATABASE_PASSWORD is set in .env.local; otherwise leave main application.yml in effect.
+spring:
+  datasource:
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:}  # Set in .env.local when using profile 'local'; empty = use main config

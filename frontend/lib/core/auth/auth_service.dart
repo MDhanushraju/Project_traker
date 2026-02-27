@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../constants/roles.dart';
 import 'auth_exception.dart';
 import '../../app/app_config.dart';
+import '../network/api_config.dart';
 import 'auth_state.dart';
 import 'token_manager.dart';
 
@@ -23,10 +26,10 @@ class AuthService {
 
   /// Restore session from storage. Call from [AppInitializer] before [runApp].
   /// Checkpoint: after this, refresh page → stays logged in.
+  /// Backend may return empty token; we restore by stored role when present.
   Future<void> restoreSession() async {
-    final token = await _tokens.getToken();
     final roleStr = await _tokens.getStoredRole();
-    if (token != null && token.isNotEmpty && roleStr != null) {
+    if (roleStr != null && roleStr.isNotEmpty) {
       final role = _parseRole(roleStr);
       if (role != null) {
         _auth.login(role);
@@ -34,12 +37,21 @@ class AuthService {
     }
   }
 
-  /// Login with email + password (optionally idCardNumber). Calls API, stores JWT + role, updates auth state.
-  Future<void> login(String email, String password, {String? idCardNumber}) async {
-    final response = await _loginApi(email, password, idCardNumber: idCardNumber);
-    final token = response['token'] as String?;
+  /// Login with email or 5-digit ID number + password. Calls API, stores JWT + role, updates auth state.
+  /// [emailOrId] can be an email address or the 5-digit login ID.
+  /// When [apisHandicapped], uses [useRoleForMock] to log in as UI-only (no API call).
+  Future<void> login(String emailOrId, String password, {String? idCardNumber, AppRole? useRoleForMock}) async {
+    if (apisHandicapped) {
+      final role = useRoleForMock ?? AppRole.member;
+      await _tokens.setToken(_mockTokenForRole(role));
+      await _tokens.setStoredRole(role.name);
+      _auth.login(role);
+      return;
+    }
+    final response = await _loginApi(emailOrId, password, idCardNumber: idCardNumber);
+    final token = response['token'] as String? ?? '';
     final roleStr = response['role'] as String?;
-    if (token == null || roleStr == null) return;
+    if (roleStr == null || roleStr.isEmpty) return;
 
     await _tokens.setToken(token);
     await _tokens.setStoredRole(roleStr);
@@ -47,10 +59,11 @@ class AuthService {
     if (role != null) _auth.login(role);
   }
 
-  /// Sign up via API. On success, does NOT auto-login; user must go to login.
+  /// Sign up via API. On success returns user info including [loginId] (5-digit ID).
+  /// Does NOT auto-login; user must go to login.
   /// Throws [AuthException] on API error (email exists, validation failed, etc).
   /// [position] is required for teamLeader and member (e.g. Developer, Tester).
-  Future<void> signUp({
+  Future<Map<String, dynamic>?> signUp({
     required String fullName,
     required String email,
     required String password,
@@ -59,35 +72,56 @@ class AuthService {
     required AppRole role,
     String? position,
   }) async {
+    if (apisHandicapped) return null; // UI-only: pretend signup succeeded, no API call.
     try {
-      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      ));
+      final body = <String, dynamic>{
+        'fullName': fullName.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        'confirmPassword': confirmPassword,
+        'role': role.name,
+      };
+      if (idCardNumber != null && idCardNumber.trim().isNotEmpty) {
+        body['idCardNumber'] = idCardNumber.trim();
+      }
+      if (position != null && position.trim().isNotEmpty) {
+        body['position'] = position.trim();
+      }
       final res = await dio.post<Map<String, dynamic>>(
         '/api/auth/signup',
-        data: {
-          'fullName': fullName.trim(),
-          'email': email.trim().toLowerCase(),
-          'password': password,
-          'confirmPassword': confirmPassword,
-          if (idCardNumber != null && idCardNumber.trim().isNotEmpty) 'idCardNumber': idCardNumber.trim(),
-          'role': role.name,
-          if (position != null && position.trim().isNotEmpty) 'position': position.trim(),
-        },
+        data: jsonEncode(body),
+        options: Options(contentType: Headers.jsonContentType, responseType: ResponseType.json),
       );
       final data = res.data;
       if (data == null || data['success'] != true) {
-        throw AuthException((data?['message'] ?? 'Sign up failed').toString());
+        throw AuthException(_extractErrorMessage(data, 'Sign up failed'));
       }
+      final d = data['data'] as Map<String, dynamic>?;
+      return d;
     } on DioException catch (e) {
-      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
-          e.message ??
-          'Sign up failed';
+      final responseData = e.response?.data;
+      final msg = responseData is Map<String, dynamic>
+          ? _extractErrorMessage(responseData, e.message ?? 'Sign up failed')
+          : (responseData is String && responseData.isNotEmpty)
+              ? responseData
+              : (e.message ?? 'Sign up failed');
       throw AuthException(msg);
     }
   }
 
   /// Login as role (calls backend /api/auth/login-with-role).
-  /// Falls back to mock token if API fails (offline/demo).
+  /// When [apisHandicapped], logs in with mock token (UI-only).
   Future<void> loginWithRole(AppRole role) async {
+    if (apisHandicapped) {
+      await _tokens.setToken(_mockTokenForRole(role));
+      await _tokens.setStoredRole(role.name);
+      _auth.login(role);
+      return;
+    }
     try {
       final res = await _loginWithRoleApi(role);
       if (res != null && res['token'] != null) {
@@ -99,14 +133,18 @@ class AuthService {
         return;
       }
     } catch (_) {}
-    // Fallback: mock token for offline/demo
+    // Fallback: mock token for offline/demo (only when APIs not handicapped)
     await _tokens.setToken(_mockTokenForRole(role));
     await _tokens.setStoredRole(role.name);
     _auth.login(role);
   }
 
   Future<Map<String, dynamic>?> _loginWithRoleApi(AppRole role) async {
-    final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+    if (apisHandicapped) return null;
+    final dio = Dio(BaseOptions(
+      baseUrl: AppConfig.apiBaseUrl,
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    ));
     final r = await dio.post<Map<String, dynamic>>('/api/auth/login-with-role', data: {'role': role.name});
     final data = r.data;
     if (data != null && data['success'] == true && data['data'] != null) {
@@ -121,41 +159,78 @@ class AuthService {
     _auth.logout();
   }
 
-  /// Login with email + password (optionally idCardNumber). Calls real API.
-  Future<Map<String, dynamic>> _loginApi(String email, String password, {String? idCardNumber}) async {
+  /// Login with email or 5-digit ID + password. Calls real API.
+  /// Sends loginId (int) if [emailOrId] is a 5-digit number, else sends email.
+  Future<Map<String, dynamic>> _loginApi(String emailOrId, String password, {String? idCardNumber}) async {
+    if (apisHandicapped) throw AuthException('APIs are disabled. Login and signup are not available.');
+    final trimmed = emailOrId.trim();
+    if (trimmed.isEmpty) throw AuthException('Email or ID number is required');
+    if (password.isEmpty) throw AuthException('Password is required');
+    if (password.trim().isEmpty) throw AuthException('Password cannot be only spaces');
     try {
-      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
-      final payload = <String, dynamic>{
-        'email': email.trim(),
-        'password': password,
-      };
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      ));
+      final payload = <String, dynamic>{'password': password};
+      final loginId = int.tryParse(trimmed);
+      if (loginId != null && trimmed.length == 5 && loginId >= 10000 && loginId <= 99999) {
+        payload['loginId'] = loginId;
+      } else {
+        payload['email'] = trimmed;
+      }
       if (idCardNumber != null && idCardNumber.trim().isNotEmpty) {
         payload['idCardNumber'] = idCardNumber.trim();
       }
       final res = await dio.post<Map<String, dynamic>>('/api/auth/login', data: payload);
       final data = res.data;
       if (data == null || data['success'] != true) {
-        throw AuthException((data?['message'] ?? 'Login failed').toString());
+        throw AuthException(_extractErrorMessage(data, 'Login failed'));
       }
       final d = data['data'] as Map<String, dynamic>?;
       if (d == null) throw AuthException('Invalid response');
       return d;
     } on DioException catch (e) {
-      final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
-          e.message ??
-          'Login failed';
+      final responseData = e.response?.data;
+      final msg = responseData is Map
+          ? _extractErrorMessage(responseData as Map<String, dynamic>, e.message ?? 'Login failed')
+          : (e.message ?? 'Login failed');
       throw AuthException(msg);
     }
+  }
+
+  /// Build a single error message from API response (message + optional errors map).
+  /// Backend sends validation errors in "data"; some APIs use "errors".
+  String _extractErrorMessage(Map<String, dynamic>? data, String fallback) {
+    if (data == null) return fallback;
+    final message = data['message']?.toString();
+    final errors = data['errors'] ?? data['data'];
+    if (errors is Map<String, dynamic>) {
+      final parts = <String>[];
+      if (message != null && message.isNotEmpty) parts.add(message);
+      for (final entry in errors.entries) {
+        final val = entry.value?.toString();
+        if (val != null && val.isNotEmpty) parts.add('${entry.key}: $val');
+      }
+      if (parts.isNotEmpty) return parts.join(' ');
+    }
+    return (message != null && message.isNotEmpty) ? message : fallback;
   }
 
   String _mockTokenForRole(AppRole role) {
     return 'mock_jwt_${role.name}_${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  /// Backend returns role as lowercase, with underscore for team_leader. Dart enum is camelCase (teamLeader).
   AppRole? _parseRole(String name) {
-    for (final r in AppRole.values) {
-      if (r.name == name) return r;
+    if (name.isEmpty) return null;
+    final normalized = name.trim().toLowerCase().replaceAll(' ', '_');
+    switch (normalized) {
+      case 'admin': return AppRole.admin;
+      case 'manager': return AppRole.manager;
+      case 'member': return AppRole.member;
+      case 'team_leader': return AppRole.teamLeader;
+      default: return null;
     }
-    return null;
   }
 }

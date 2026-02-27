@@ -28,7 +28,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return new AntPathRequestMatcher("/api/auth/**").matches(request);
+        String path = request != null ? request.getRequestURI() : "";
+        return path.startsWith("/api/auth/") || path.startsWith("/api/health/");
     }
 
     @Override

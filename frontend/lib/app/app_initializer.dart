@@ -1,8 +1,8 @@
 import '../core/auth/auth_service.dart';
+import '../core/network/api_config.dart';
 import '../core/theme/theme_mode_state.dart';
 
-/// Runs one-time app setup before [runApp].
-/// Restores auth session and theme preference.
+/// Runs one-time app setup before [runApp]. Localhost only — no Render.
 class AppInitializer {
   AppInitializer._();
 

@@ -44,7 +44,7 @@ public class OpenApiConfig {
                                 "- Click Authorize above, enter: Bearer your_token\n" +
                                 "- Most endpoints (except auth) require this token\n\n" +
                                 "### Test Credentials (from DataLoader)\n" +
-                                "Admin: admin@taker.com / Admin@123 | Manager: manager@taker.com / Password@1\n" +
+                                "Admin: admin@taker.com / Dhanush@03 | Manager: manager@taker.com / Password@1\n" +
                                 "Team Leader: leader@taker.com / Password@1 | Team Member: member@taker.com / Password@1\n\n" +
                                 "### Quick Test Order\n" +
                                 "1. Login to get token, then Authorize\n" +

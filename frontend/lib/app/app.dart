@@ -132,17 +132,28 @@ class _AppState extends State<App> {
         final args = ModalRoute.of(context)?.settings.arguments;
         if (args is UserDetailsArgs) {
           return UserDetailsPage(
+            userId: args.userId,
             name: args.name,
             title: args.title,
             role: args.role,
+            roleApi: args.roleApi,
             projects: args.projects,
             status: args.status,
             isTemporary: args.isTemporary,
+            email: args.email,
+            loginId: args.loginId,
+            photoUrl: args.photoUrl,
+            currentProject: args.currentProject,
+            projectsCompletedCount: args.projectsCompletedCount,
+            age: args.age,
+            skills: args.skills,
+            managerName: args.managerName,
+            teamLeaderName: args.teamLeaderName,
           );
         }
-        return const LoginPage();
+        return const LoginFormPage();
       default:
-        return const LoginPage();
+        return const LoginFormPage();
     }
   }
 
@@ -154,11 +165,11 @@ class _AppState extends State<App> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeModeState.instance.themeMode,
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.loginForm,
       onGenerateRoute: (settings) {
-        final name = settings.name ?? AppRoutes.login;
+        final name = settings.name ?? AppRoutes.loginForm;
         final effectiveRoute =
-            _kKnownRoutes.contains(name) ? name : AppRoutes.login;
+            _kKnownRoutes.contains(name) ? name : AppRoutes.loginForm;
         final result = AuthGuard.check(effectiveRoute, AuthState.instance);
 
         if (result.allowed) {

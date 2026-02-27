@@ -72,6 +72,7 @@ class _DashboardPageState extends State<DashboardPage> {
       return MainLayout(
         title: 'Admin Hub',
         currentRoute: AppRoutes.dashboard,
+        showTopBarActions: false,
         child: const _AdminHubContent(),
       );
     }
@@ -80,6 +81,7 @@ class _DashboardPageState extends State<DashboardPage> {
       return MainLayout(
         title: 'Manager Hub',
         currentRoute: AppRoutes.dashboard,
+        showTopBarActions: false,
         child: const _ManagerHubContent(),
       );
     }

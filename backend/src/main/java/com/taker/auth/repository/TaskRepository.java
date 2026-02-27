@@ -8,4 +8,8 @@ import java.util.List;
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByAssignedToId(Long userId);
+
+    List<Task> findByAssignedToIdIn(List<Long> userIds);
+
+    long countByAssignedToIdAndStatus(Long assignedToId, String status);
 }

@@ -18,11 +18,14 @@ class MainLayout extends StatelessWidget {
     required this.title,
     required this.currentRoute,
     required this.child,
+    this.showTopBarActions = true,
   });
 
   final String title;
   final String currentRoute;
   final Widget child;
+  /// When false, top bar shows only title (no profile/notifications). Use for admin/manager dashboard.
+  final bool showTopBarActions;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +51,7 @@ class MainLayout extends StatelessWidget {
             navItems: navItems,
             onNavigate: onNavigate,
             child: child,
+            showTopBarActions: showTopBarActions,
           );
         }
 
@@ -57,6 +61,7 @@ class MainLayout extends StatelessWidget {
           navItems: navItems,
           onNavigate: onNavigate,
           child: child,
+          showTopBarActions: showTopBarActions,
         );
       },
     );
@@ -70,6 +75,7 @@ class _DesktopShell extends StatelessWidget {
     required this.navItems,
     required this.onNavigate,
     required this.child,
+    this.showTopBarActions = true,
   });
 
   final String title;
@@ -77,6 +83,7 @@ class _DesktopShell extends StatelessWidget {
   final List<NavItem> navItems;
   final void Function(String route) onNavigate;
   final Widget child;
+  final bool showTopBarActions;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +136,7 @@ class _DesktopShell extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const UserProfileMenu(),
+                        if (showTopBarActions) const UserProfileMenu(),
                       ],
                     ),
                   ),
@@ -151,6 +158,7 @@ class _MobileShell extends StatelessWidget {
     required this.navItems,
     required this.onNavigate,
     required this.child,
+    this.showTopBarActions = true,
   });
 
   final String title;
@@ -158,6 +166,7 @@ class _MobileShell extends StatelessWidget {
   final List<NavItem> navItems;
   final void Function(String route) onNavigate;
   final Widget child;
+  final bool showTopBarActions;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +177,7 @@ class _MobileShell extends StatelessWidget {
           icon: const Icon(Icons.menu_rounded),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
-        actions: const [UserProfileMenu()],
+        actions: showTopBarActions ? const [UserProfileMenu()] : null,
       ),
       drawer: Drawer(
         child: Sidebar(

@@ -14,6 +14,14 @@ public class TaskDto {
     private String status;
     @Schema(example = "2025-03-15")
     private LocalDate dueDate;
+    @Schema(example = "3", description = "Assignee user ID")
+    private Long assigneeId;
+    @Schema(example = "Jane Doe", description = "Assignee display name")
+    private String assigneeName;
+    @Schema(example = "1", description = "Project ID")
+    private Long projectId;
+    @Schema(example = "Website Redesign", description = "Project name")
+    private String projectName;
 
     public Long getId() {
         return id;
@@ -46,4 +54,13 @@ public class TaskDto {
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
     }
+
+    public Long getAssigneeId() { return assigneeId; }
+    public void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }
+    public String getAssigneeName() { return assigneeName; }
+    public void setAssigneeName(String assigneeName) { this.assigneeName = assigneeName; }
+    public Long getProjectId() { return projectId; }
+    public void setProjectId(Long projectId) { this.projectId = projectId; }
+    public String getProjectName() { return projectName; }
+    public void setProjectName(String projectName) { this.projectName = projectName; }
 }

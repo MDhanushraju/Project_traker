@@ -43,13 +43,30 @@ if (-not $GradleCmd) {
     exit 1
 }
 
-# Port check
-$port = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($port) {
-    Write-Host "Port 8080 in use by PID $($port.OwningProcess). Run: Stop-Process -Id $($port.OwningProcess) -Force" -ForegroundColor Yellow
+# Port check (backend default port from application.yml)
+# Only block if something is actually LISTENING; ignore TIME_WAIT (can show PID 0)
+$backendPort = 8080
+$listener = Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($listener -and $listener.OwningProcess -gt 0) {
+    Write-Host "Port $backendPort in use by PID $($listener.OwningProcess). Run: Stop-Process -Id $($listener.OwningProcess) -Force" -ForegroundColor Yellow
     exit 1
 }
 
 Set-Location $ProjectDir
+
+# Load .env.local if present (optional; application.yml can have username/password directly)
+$envFile = Join-Path $ProjectDir ".env.local"
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+            $key = $matches[1].Trim()
+            $val = $matches[2].Trim() -replace '^["'']|["'']$'
+            Set-Item -Path "env:$key" -Value $val
+        }
+    }
+}
+
+# Run without profile so application.yml datasource (username/password) is used.
+# If you prefer .env.local only, use: --args='--spring.profiles.active=local'
 Write-Host "Running: $GradleCmd bootRun" -ForegroundColor Cyan
 & $GradleCmd bootRun @args

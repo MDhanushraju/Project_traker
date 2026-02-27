@@ -4,11 +4,12 @@ import '../../../core/constants/roles.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/auth/auth_exception.dart';
 import '../../../core/auth/role_access.dart';
+import '../../../core/network/api_config.dart';
 import '../../../app/app_routes.dart';
 import 'auth_theme.dart';
 
 /// Log In credentials page. Shown after selecting a role on the first page.
-/// Fields: ID Card Number, Email, Password. Dark theme, responsive.
+/// User can log in with either Email or 5-digit ID Number, and password.
 class LoginFormPage extends StatefulWidget {
   const LoginFormPage({super.key, this.selectedRole});
 
@@ -21,12 +22,12 @@ class LoginFormPage extends StatefulWidget {
 
 class _LoginFormPageState extends State<LoginFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final _idCardController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _emailOrIdController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  String? _loginError;
 
   AppRole get _role =>
       ModalRoute.of(context)?.settings.arguments as AppRole? ??
@@ -36,23 +37,19 @@ class _LoginFormPageState extends State<LoginFormPage> {
 
   @override
   void dispose() {
-    _idCardController.dispose();
-    _emailController.dispose();
+    _emailOrIdController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
     try {
       await AuthService.instance.login(
-        _emailController.text.trim(),
+        _emailOrIdController.text.trim(),
         _passwordController.text,
-        idCardNumber: _idCardController.text.trim().isEmpty
-            ? null
-            : _idCardController.text.trim(),
+        useRoleForMock: apisHandicapped ? _role : null,
       );
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -71,12 +68,37 @@ class _LoginFormPageState extends State<LoginFormPage> {
         }
         final route = RoleAccess.defaultRouteForRole(r);
         Navigator.of(context).pushReplacementNamed(route);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login succeeded but session could not be restored. Please try again.')),
+        );
       }
     } on AuthException catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      const warningMsg = 'Wrong email, ID number, or password. Please check and try again.';
+      setState(() {
+        _isLoading = false;
+        _loginError = warningMsg;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(
+          content: const Text(warningMsg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loginError = 'Wrong email, ID number, or password. Please check and try again.';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Wrong email, ID number, or password. Please check and try again.'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -116,7 +138,13 @@ class _LoginFormPageState extends State<LoginFormPage> {
                         Row(
                           children: [
                             IconButton(
-                              onPressed: () => Navigator.of(context).pop(),
+                              onPressed: () {
+                                if (Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                } else {
+                                  Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+                                }
+                              },
                               icon: const Icon(Icons.arrow_back),
                               color: AuthTheme.textPrimary(context),
                               style: IconButton.styleFrom(
@@ -146,6 +174,34 @@ class _LoginFormPageState extends State<LoginFormPage> {
                               .bodyLarge
                               ?.copyWith(color: AuthTheme.textSecondary(context)),
                         ),
+                        if (_loginError != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade900.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade700, width: 1),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Colors.red.shade300, size: 22),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _loginError!,
+                                    style: TextStyle(
+                                      color: Colors.red.shade200,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -167,28 +223,42 @@ class _LoginFormPageState extends State<LoginFormPage> {
                                   ),
                                 ),
                               ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pushReplacementNamed(AppRoutes.login),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AuthTheme.primaryBlue,
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Change role'),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 28),
                         _buildInput(
-                          controller: _idCardController,
-                          label: 'ID Card Number (optional)',
-                          hint: 'Leave blank if not set during signup',
-                          icon: Icons.badge_outlined,
+                          controller: _emailOrIdController,
+                          label: 'Email or ID Number',
+                          hint: 'Enter your email or 5-digit ID number',
+                          icon: Icons.person_outline,
+                          keyboardType: TextInputType.text,
+                          onChanged: (_) => setState(() => _loginError = null),
+                          validator: (v) {
+                            final s = v?.trim() ?? '';
+                            if (s.isEmpty) return 'Email or ID number is required';
+                            final id = int.tryParse(s);
+                            if (id != null && (s.length != 5 || id < 10000 || id > 99999)) {
+                              return 'ID number must be 5 digits (e.g. 10001)';
+                            }
+                            if (id == null && (!s.contains('@') || !s.contains('.'))) {
+                              return 'Enter a valid email or 5-digit ID';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
-                        _buildInput(
-                          controller: _emailController,
-                          label: 'Email Address',
-                          hint: 'name@example.com',
-                          icon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildPasswordField(role),
+                        _buildPasswordField(role, onChanged: () => setState(() => _loginError = null)),
                         const SizedBox(height: 24),
                         FilledButton(
                           onPressed: _isLoading ? null : _login,
@@ -231,6 +301,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
+    void Function(String)? onChanged,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -238,6 +309,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
       style: TextStyle(color: AuthTheme.textPrimary(context)),
       keyboardType: keyboardType,
       textInputAction: TextInputAction.next,
+      onChanged: onChanged,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
@@ -247,7 +319,7 @@ class _LoginFormPageState extends State<LoginFormPage> {
     );
   }
 
-  Widget _buildPasswordField(AppRole role) {
+  Widget _buildPasswordField(AppRole role, {VoidCallback? onChanged}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -256,8 +328,12 @@ class _LoginFormPageState extends State<LoginFormPage> {
           obscureText: _obscurePassword,
           style: TextStyle(color: AuthTheme.textPrimary(context)),
           textInputAction: TextInputAction.done,
-          validator: (v) =>
-              (v == null || v.isEmpty) ? 'Required' : null,
+          onChanged: onChanged != null ? (_) => onChanged() : null,
+          validator: (v) {
+            if (v == null || v.isEmpty) return 'Password is required';
+            if (v.trim().isEmpty) return 'Password cannot be only spaces';
+            return null;
+          },
           decoration: InputDecoration(
             labelText: 'Password',
             prefixIcon: Icon(

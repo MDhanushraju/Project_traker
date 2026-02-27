@@ -26,7 +26,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.postgresql:postgresql:42.7.3'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
@@ -40,6 +40,29 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    if (!project.hasProperty('includeIntegration')) {
+        filter { excludeTestsMatching '*DbConnectionTest*' }
+    }
+    reports.html.required = true
+    reports.junitXml.required = true
+}
+
+// Open the HTML test report in the default browser (run: gradlew test openTestReport)
+tasks.register('openTestReport') {
+    doLast {
+        def reportFile = file("${layout.buildDirectory.get()}/reports/tests/test/index.html")
+        if (!reportFile.exists()) {
+            logger.warn("Test report not found. Run 'gradlew test' first.")
+            return
+        }
+        def path = reportFile.absolutePath.replace("\\", "/")
+        def uri = "file:///" + path
+        if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+            exec { commandLine 'cmd', '/c', 'start', '', uri }
+        } else {
+            exec { commandLine 'xdg-open', uri }
+        }
+    }
 }
 sonar {
     properties {

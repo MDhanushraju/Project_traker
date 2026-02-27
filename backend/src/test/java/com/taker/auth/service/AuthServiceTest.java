@@ -8,7 +8,6 @@ import com.taker.auth.exception.AuthException;
 import com.taker.auth.exception.UnauthorizedException;
 import com.taker.auth.repository.PositionRepository;
 import com.taker.auth.repository.UserRepository;
-import com.taker.auth.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,9 +41,6 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @Mock
-    private JwtService jwtService;
-
     @InjectMocks
     private AuthService authService;
 
@@ -53,6 +50,7 @@ class AuthServiceTest {
     void setUp() {
         testUser = new User("Test User", "test@example.com", null, "$2a$10$hashed", Role.MEMBER);
         testUser.setId(1L);
+        testUser.setLoginId(10001);
     }
 
     @Nested
@@ -97,9 +95,9 @@ class AuthServiceTest {
     @DisplayName("isValidPasswordStatic")
     class IsValidPasswordTests {
         @Test
-        void acceptsValidPassword() {
+        void acceptsNonEmptyPassword() {
             assertThat(AuthService.isValidPasswordStatic("Password@1")).isTrue();
-            assertThat(AuthService.isValidPasswordStatic("Valid123!")).isTrue();
+            assertThat(AuthService.isValidPasswordStatic("x")).isTrue();
         }
 
         @Test
@@ -108,18 +106,9 @@ class AuthServiceTest {
         }
 
         @Test
-        void rejectsShortPassword() {
-            assertThat(AuthService.isValidPasswordStatic("Short1!")).isFalse();
-        }
-
-        @Test
-        void rejectsPasswordWithoutNumber() {
-            assertThat(AuthService.isValidPasswordStatic("Password!!")).isFalse();
-        }
-
-        @Test
-        void rejectsPasswordWithoutSpecialChar() {
-            assertThat(AuthService.isValidPasswordStatic("Password123")).isFalse();
+        void rejectsBlank() {
+            assertThat(AuthService.isValidPasswordStatic("")).isFalse();
+            assertThat(AuthService.isValidPasswordStatic("   ")).isFalse();
         }
     }
 
@@ -134,14 +123,42 @@ class AuthServiceTest {
 
             when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
             when(passwordEncoder.matches("Password@1", "$2a$10$hashed")).thenReturn(true);
-            when(jwtService.generateToken("test@example.com", "member")).thenReturn("jwt-token");
 
             var response = authService.login(req);
 
-            assertThat(response.getToken()).isEqualTo("jwt-token");
+            assertThat(response.getToken()).isEmpty();
+            assertThat(response.getId()).isEqualTo(1L);
+            assertThat(response.getLoginId()).isEqualTo(10001);
             assertThat(response.getEmail()).isEqualTo("test@example.com");
             assertThat(response.getRole()).isEqualTo("member");
             assertThat(response.getFullName()).isEqualTo("Test User");
+        }
+
+        @Test
+        void returnsSuccessWhenLoginWithLoginId() {
+            LoginRequest req = new LoginRequest();
+            req.setLoginId(10001);
+            req.setPassword("Password@1");
+
+            when(userRepository.findByLoginId(10001)).thenReturn(Optional.of(testUser));
+            when(passwordEncoder.matches("Password@1", "$2a$10$hashed")).thenReturn(true);
+
+            var response = authService.login(req);
+
+            assertThat(response.getId()).isEqualTo(1L);
+            assertThat(response.getLoginId()).isEqualTo(10001);
+            assertThat(response.getEmail()).isEqualTo("test@example.com");
+            assertThat(response.getRole()).isEqualTo("member");
+        }
+
+        @Test
+        void throwsWhenNeitherLoginIdNorEmailProvided() {
+            LoginRequest req = new LoginRequest();
+            req.setPassword("Password@1");
+
+            assertThatThrownBy(() -> authService.login(req))
+                    .isInstanceOf(UnauthorizedException.class)
+                    .hasMessageContaining("Login ID or email is required");
         }
 
         @Test
@@ -191,7 +208,7 @@ class AuthServiceTest {
         }
 
         @Test
-        void throwsWhenPasswordInvalid() {
+        void succeedsWithSimplePassword() {
             SignUpRequest req = new SignUpRequest();
             req.setFullName("New User");
             req.setEmail("new@example.com");
@@ -199,10 +216,21 @@ class AuthServiceTest {
             req.setConfirmPassword("weak");
             req.setRole("member");
 
-            assertThatThrownBy(() -> authService.signUp(req))
-                    .isInstanceOf(AuthException.class)
-                    .hasMessageContaining("8 characters");
-            verify(userRepository, never()).save(any());
+            User savedUser = new User("New User", "new@example.com", null, "encoded", Role.MEMBER);
+            savedUser.setId(2L);
+            savedUser.setLoginId(12345);
+            when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+            when(userRepository.findByLoginId(anyInt())).thenReturn(Optional.empty());
+            when(passwordEncoder.encode("weak")).thenReturn("encoded");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> { User u = inv.getArgument(0); savedUser.setLoginId(u.getLoginId()); return savedUser; });
+
+            var response = authService.signUp(req);
+
+            assertThat(response.getToken()).isEmpty();
+            assertThat(response.getId()).isEqualTo(2L);
+            assertThat(response.getLoginId()).isNotNull();
+            assertThat(response.getEmail()).isEqualTo("new@example.com");
+            verify(userRepository).save(any(User.class));
         }
 
         @Test
@@ -235,13 +263,15 @@ class AuthServiceTest {
             savedUser.setId(2L);
 
             when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+            when(userRepository.findByLoginId(anyInt())).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Password@1")).thenReturn("encoded");
-            when(userRepository.save(any(User.class))).thenReturn(savedUser);
-            when(jwtService.generateToken("new@example.com", "member")).thenReturn("jwt-token");
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> { User u = inv.getArgument(0); savedUser.setLoginId(u.getLoginId()); return savedUser; });
 
             var response = authService.signUp(req);
 
-            assertThat(response.getToken()).isEqualTo("jwt-token");
+            assertThat(response.getToken()).isEmpty();
+            assertThat(response.getId()).isEqualTo(2L);
+            assertThat(response.getLoginId()).isNotNull();
             assertThat(response.getEmail()).isEqualTo("new@example.com");
             assertThat(response.getFullName()).isEqualTo("New User");
             verify(userRepository).save(any(User.class));

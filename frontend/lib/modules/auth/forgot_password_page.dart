@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/auth/auth_exception.dart';
+import '../../../core/network/api_config.dart';
 import 'auth_theme.dart';
 
-/// Forgot Password: enter email to receive 4-digit verification code.
+/// Forgot Password: enter email or 5-digit ID to receive verification question (math). Popup shows the code, then user enters answer and new password.
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
 
@@ -16,23 +17,33 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _emailOrIdController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _emailOrIdController.dispose();
     super.dispose();
   }
 
   Future<void> _sendCode() async {
     if (!_formKey.currentState!.validate()) return;
+    if (apisHandicapped) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('APIs are disabled.')));
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final trimmed = _emailOrIdController.text.trim();
+      final loginId = int.tryParse(trimmed);
+      final bool isId = loginId != null && trimmed.length == 5 && loginId >= 10000 && loginId <= 99999;
+      final Map<String, dynamic> body = isId
+          ? {'loginId': loginId}
+          : {'email': trimmed.toLowerCase()};
       final res = await dio.post<Map<String, dynamic>>(
         '/api/auth/forgot-password',
-        data: {'email': _emailController.text.trim().toLowerCase()},
+        data: body,
       );
       if (!mounted) return;
       final data = res.data;
@@ -41,13 +52,20 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       }
       final d = data['data'] as Map<String, dynamic>?;
       final captcha = d?['captchaQuestion']?.toString();
+      final emailForReset = d?['email']?.toString().trim();
+      final email = (emailForReset != null && emailForReset.isNotEmpty)
+          ? emailForReset
+          : trimmed.toLowerCase();
       if (captcha == null || captcha.isEmpty) {
-        throw AuthException('No captcha received');
+        throw AuthException('No verification code received');
       }
+      if (!mounted) return;
+      await _showVerificationPopup(captcha);
+      if (!mounted) return;
       Navigator.of(context).pushNamed(
-        AppRoutes.forgotPasswordOtp,
+        AppRoutes.resetPassword,
         arguments: {
-          'email': _emailController.text.trim().toLowerCase(),
+          'email': email,
           'captchaQuestion': captcha,
         },
       );
@@ -55,15 +73,126 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       final msg = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null)?.toString() ??
           e.message ?? 'Request failed';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        _showAccountNotFoundOrError(msg);
       }
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        _showAccountNotFoundOrError(e.message);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showAccountNotFoundOrError(String message) {
+    final isNotFound = message.toLowerCase().contains('no account found') ||
+        message.toLowerCase().contains('not found');
+    final displayMessage = isNotFound
+        ? 'No account found with this email or ID. Please sign up first.'
+        : message;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(displayMessage),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+    if (isNotFound) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AuthTheme.cardBackground(context),
+          title: Text(
+            'Account not found',
+            style: TextStyle(color: AuthTheme.textPrimary(context)),
+          ),
+          content: Text(
+            'No account found with this email or ID number. Please sign up first to create an account.',
+            style: TextStyle(color: AuthTheme.textSecondary(context)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                Navigator.of(context).pushReplacementNamed(AppRoutes.signUp);
+              },
+              style: FilledButton.styleFrom(backgroundColor: AuthTheme.primaryBlue),
+              child: const Text('Sign up'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _showVerificationPopup(String captchaQuestion) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AuthTheme.cardBackground(context),
+        title: Row(
+          children: [
+            Icon(Icons.lock_reset, color: AuthTheme.primaryBlue, size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Verification code',
+                style: TextStyle(
+                  color: AuthTheme.textPrimary(context),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Answer this question on the next screen to reset your password:',
+              style: TextStyle(
+                color: AuthTheme.textSecondary(context),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                color: AuthTheme.primaryBlue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AuthTheme.primaryBlue.withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                captchaQuestion,
+                style: TextStyle(
+                  color: AuthTheme.primaryBlue,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: FilledButton.styleFrom(backgroundColor: AuthTheme.primaryBlue),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -119,7 +248,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Enter your email address to receive a 4-digit verification code.',
+                          'Enter your email or 5-digit ID number. If an account exists, you will get a verification question.',
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
@@ -127,20 +256,27 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                         const SizedBox(height: 28),
                         TextFormField(
-                          controller: _emailController,
+                          controller: _emailOrIdController,
                           style: TextStyle(color: AuthTheme.textPrimary(context)),
-                          keyboardType: TextInputType.emailAddress,
+                          keyboardType: TextInputType.text,
                           decoration: InputDecoration(
-                            labelText: 'Email Address',
-                            hintText: 'example@email.com',
+                            labelText: 'Email or ID Number',
+                            hintText: 'e.g. name@email.com or 10001',
                             prefixIcon: Icon(
-                              Icons.email_outlined,
+                              Icons.person_outline,
                               color: AuthTheme.textSecondary(context),
                               size: 22,
                             ),
                           ),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
+                          validator: (v) {
+                            final s = v?.trim() ?? '';
+                            if (s.isEmpty) return 'Email or ID number is required';
+                            final id = int.tryParse(s);
+                            if (id != null && (s.length != 5 || id < 10000 || id > 99999)) {
+                              return 'ID must be 5 digits (e.g. 10001)';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 24),
                         FilledButton.icon(
@@ -154,8 +290,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.arrow_forward, size: 20),
-                          label: Text(_isLoading ? 'Sending…' : 'Send Code'),
+                              : const Icon(Icons.verified_user_outlined, size: 20),
+                          label: Text(_isLoading ? 'Verifying…' : 'Verify'),
                           style: FilledButton.styleFrom(
                             backgroundColor: AuthTheme.primaryBlue,
                             foregroundColor: AuthTheme.background(context),

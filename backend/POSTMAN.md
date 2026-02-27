@@ -5,9 +5,24 @@
 
 ---
 
+## 0. Check database and that backend is reading data
+
+**GET** `http://localhost:8080/api/health/db`  
+No body, no auth.
+
+- **If DB is connected:** status 200, body like `{ "success": true, "data": { "database": "connected", "usersCount": 5 } }`.
+- **If DB is not connected:** status 503, message like "Database not connected: Connection refused" (check PostgreSQL is running and `application.yml` url/username/password).
+
+After a signup attempt, check the **backend console** (terminal where you ran the backend). You should see:
+- `[Signup] Request received: email=... fullName=... role=...` → backend is reading the request body.
+- If signup fails, the next line will show the real error (e.g. DB exception, constraint violation).
+
+---
+
 ## 1. Sign Up
 
-**POST** `/api/auth/signup`
+**POST** `http://localhost:8080/api/auth/signup`  
+Use **lowercase** `signup` (not `/Signup` or `/singup`).
 
 ```json
 {
@@ -33,7 +48,7 @@
 {
   "idCardNumber": "000-0000-001",
   "email": "admin@taker.com",
-  "password": "Admin@123"
+  "password": "Dhanush@03"
 }
 ```
 
@@ -90,5 +105,5 @@ Password rules: at least 8 chars, one digit, one special character.
 
 | Email             | ID Card     | Password   | Role   |
 |-------------------|-------------|------------|--------|
-| admin@taker.com   | 000-0000-001| Admin@123  | admin  |
+| admin@taker.com   | 000-0000-001| Dhanush@03 | admin  |
 | member@taker.com  | 000-0000-003| Member@123 | member |

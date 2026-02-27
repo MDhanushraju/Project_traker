@@ -1,5 +1,6 @@
 package com.taker.auth.controller;
 
+import com.taker.auth.dto.ApiResponse;
 import com.taker.auth.dto.AssignTaskRequest;
 import com.taker.auth.dto.CreateTaskRequest;
 import com.taker.auth.dto.TaskDto;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "Tasks", description = "Task CRUD, status updates, assign - requires auth")
+@Tag(name = "Tasks", description = "Task CRUD, status updates, assign - requires auth. Frontend expects { success, message, data }.")
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
@@ -25,45 +26,45 @@ public class TaskController {
         this.taskService = taskService;
     }
 
-    @Operation(summary = "List tasks", description = "Get all tasks or filter by userId. Example: ?userId=3")
+    @Operation(summary = "List tasks", description = "By default returns tasks visible to current user (role-based). Use ?userId=3 for that user's tasks only.")
     @GetMapping
-    public ResponseEntity<List<TaskDto>> getTasks(
+    public ResponseEntity<ApiResponse<List<TaskDto>>> getTasks(
             @RequestParam(required = false) Long userId) {
         List<TaskDto> tasks = userId != null
                 ? taskService.findByAssignedUser(userId)
-                : taskService.findAll();
-        return ResponseEntity.ok(tasks);
+                : taskService.findTasksForCurrentUser();
+        return ResponseEntity.ok(ApiResponse.success("OK", tasks));
     }
 
-    @Operation(summary = "Create task", description = "Create task. Example: title=Setup env, status=need_to_start, dueDate=2025-03-15")
+    @Operation(summary = "Create task", description = "Create task. Frontend: title, status (default need_to_start), dueDate optional.")
     @PostMapping
-    public ResponseEntity<TaskDto> createTask(@Valid @RequestBody CreateTaskRequest request) {
-        return ResponseEntity.ok(taskService.createTask(request));
+    public ResponseEntity<ApiResponse<TaskDto>> createTask(@Valid @RequestBody CreateTaskRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Task created", taskService.createTask(request)));
     }
 
-    @Operation(summary = "Update task status", description = "Set status: need_to_start, ongoing, completed. Example: status=ongoing")
+    @Operation(summary = "Update task status", description = "Set status: need_to_start, ongoing, completed.")
     @PatchMapping("/{id}/status")
-    public ResponseEntity<TaskDto> updateStatus(
+    public ResponseEntity<ApiResponse<TaskDto>> updateStatus(
             @Parameter(description = "Task ID", example = "1") @PathVariable Long id,
             @Valid @RequestBody UpdateTaskStatusRequest request) {
-        return ResponseEntity.ok(taskService.updateStatus(id, request));
+        return ResponseEntity.ok(ApiResponse.success("Status updated", taskService.updateStatus(id, request)));
     }
 
-    @Operation(summary = "Delete task", description = "Delete task by ID")
+    @Operation(summary = "Delete task", description = "Delete task by ID. Returns 204.")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@Parameter(description = "Task ID", example = "1") @PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Assign task", description = "Create/assign task to user. Example: userId=3, taskTitle=Review design, dueDate=2025-03-20")
+    @Operation(summary = "Assign task", description = "Create/assign task to user. Frontend: userId, taskTitle, dueDate optional, projectId optional.")
     @PostMapping("/assign")
-    public ResponseEntity<TaskDto> assignTask(@Valid @RequestBody AssignTaskRequest request) {
+    public ResponseEntity<ApiResponse<TaskDto>> assignTask(@Valid @RequestBody AssignTaskRequest request) {
         TaskDto task = taskService.assignTask(
                 request.getUserId(),
                 request.getTaskTitle(),
                 request.getDueDate(),
                 request.getProjectId());
-        return ResponseEntity.ok(task);
+        return ResponseEntity.ok(ApiResponse.success("Task assigned", task));
     }
 }

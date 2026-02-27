@@ -37,10 +37,54 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Role updated", dataService.assignRole(id, request)));
     }
 
-    @Operation(summary = "Get all users", description = "Returns list of all users with id, name, role, position. Requires auth.")
+    @Operation(summary = "Assign user to project (new joiner)", description = "Admin/Manager: Add user to a project with project role (manager, team_leader, team_member).")
+    @PostMapping("/{id}/assign-project")
+    public ResponseEntity<ApiResponse<UserSummaryDto>> assignProject(
+            @Parameter(description = "User ID") @PathVariable Long id,
+            @Valid @RequestBody AssignProjectRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("User assigned to project", dataService.assignUserToProject(id, request.getProjectId(), request.getProjectRole())));
+    }
+
+    @Operation(summary = "Get user count", description = "Returns total number of users in the database. Use to verify data (e.g. 78 users).")
+    @GetMapping("/count")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getCount() {
+        long count = dataService.getUserCount();
+        return ResponseEntity.ok(ApiResponse.success("OK", Map.of("count", count)));
+    }
+
+    @Operation(summary = "Get all users", description = "Returns all users from DB with role, name, email, etc. No filter = full list.")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<UserSummaryDto>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success("OK", dataService.getAllUsers()));
+    public ResponseEntity<ApiResponse<List<UserSummaryDto>>> getAll(
+            @Parameter(description = "Filter as this role") @RequestParam(required = false) String forRole,
+            @Parameter(description = "Current user email for filtering") @RequestParam(required = false) String forEmail) {
+        List<UserSummaryDto> list = (forRole != null || (forEmail != null && !forEmail.isBlank()))
+                ? dataService.getAllUsersFiltered(forRole, forEmail)
+                : dataService.getAllUsers();
+        return ResponseEntity.ok(ApiResponse.success("OK", list));
+    }
+
+    @Operation(summary = "Get user by ID", description = "Returns full user details for profile/details page.")
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<UserSummaryDto>> getById(@PathVariable Long id) {
+        return dataService.getUserById(id)
+                .map(dto -> ResponseEntity.ok(ApiResponse.success("OK", dto)))
+                .orElse(ResponseEntity.status(404).body(ApiResponse.failure(404, "User not found")));
+    }
+
+    @Operation(summary = "Kick user", description = "Admin: kick anyone except admin. Manager: kick team leader or team member. Removes user from system.")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> kick(@Parameter(description = "User ID to kick") @PathVariable Long id) {
+        dataService.kickUser(id);
+        return ResponseEntity.ok(ApiResponse.success("User removed", null));
+    }
+
+    @Operation(summary = "Update user profile", description = "Update photo URL, age, skills. User can update own; Admin/Manager can update any.")
+    @PatchMapping("/{id}/profile")
+    public ResponseEntity<ApiResponse<UserSummaryDto>> updateProfile(
+            @PathVariable Long id,
+            @RequestBody(required = false) UpdateProfileRequest request) {
+        if (request == null) request = new UpdateProfileRequest();
+        return ResponseEntity.ok(ApiResponse.success("Profile updated", dataService.updateUserProfile(id, request)));
     }
 
     @Operation(summary = "Team Leader: My projects", description = "Returns project names assigned to logged-in Team Leader.")

@@ -28,7 +28,7 @@ class AuthGuard {
           routeName == AppRoutes.resetPassword) {
         return const GuardResult.allow();
       }
-      return const GuardResult.redirect(AppRoutes.login);
+      return const GuardResult.redirect(AppRoutes.loginForm);
     }
 
     // Logged in: visiting auth pages → redirect to default home by role

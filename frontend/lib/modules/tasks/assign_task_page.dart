@@ -66,7 +66,13 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
       _assignableUsers = byId.values.toList();
     } else {
       final users = await DataProvider.instance.getAllUsers();
-      _assignableUsers = users
+      final roleStr = (u) => (u['role'] ?? '').toString().toLowerCase();
+      final filtered = role == AppRole.manager
+          ? users.where((u) => roleStr(u) == 'team_leader' || roleStr(u) == 'member')
+          : role == AppRole.admin
+              ? users.where((u) => roleStr(u) != 'admin')
+              : users;
+      _assignableUsers = filtered
           .map((u) {
             final id = u['id'];
             if (id == null) return null;
@@ -131,20 +137,24 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
               ),
             ),
             const SizedBox(height: 28),
-            if (AuthState.instance.currentUser?.role == AppRole.teamLeader) ...[
+            if (AuthState.instance.currentUser?.role == AppRole.teamLeader ||
+                AuthState.instance.currentUser?.role == AppRole.manager ||
+                AuthState.instance.currentUser?.role == AppRole.admin) ...[
               _DropdownField(
                 label: 'Project',
-                hint: 'Filter by project',
+                hint: 'Assign task to this project',
                 icon: Icons.folder_outlined,
                 value: _selectedProject ?? 'All',
-                options: ['All', ...MockData.teamLeaderAssignedProjects],
+                options: ['All', ...MockData.projects.map((p) => p.name ?? '').where((n) => n.isNotEmpty)],
                 onSelected: (v) {
                   setState(() {
                     _selectedProject = v == 'All' ? null : v;
-                    _selectedUser = null;
-                    _selectedUserId = null;
+                    if (AuthState.instance.currentUser?.role == AppRole.teamLeader) {
+                      _selectedUser = null;
+                      _selectedUserId = null;
+                      _loadAssignableUsers();
+                    }
                   });
-                  _loadAssignableUsers();
                 },
               ),
               const SizedBox(height: 16),
@@ -305,7 +315,7 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
           '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}';
     }
     int? projectId;
-    if (_selectedProject != null && AuthState.instance.currentUser?.role == AppRole.teamLeader) {
+    if (_selectedProject != null) {
       for (final p in MockData.projects) {
         if (p.name == _selectedProject && p.id != null) {
           projectId = int.tryParse(p.id!);

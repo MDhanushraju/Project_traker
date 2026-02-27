@@ -1,11 +1,13 @@
 package com.taker.auth.service;
 
+import com.taker.auth.dto.CreateTaskRequest;
 import com.taker.auth.dto.UpdateTaskStatusRequest;
 import com.taker.auth.entity.Task;
 import com.taker.auth.entity.User;
 import com.taker.auth.exception.NotFoundException;
 import com.taker.auth.repository.TaskRepository;
 import com.taker.auth.repository.UserRepository;
+import com.taker.auth.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +21,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -190,6 +193,116 @@ class TaskServiceTest {
                     .isInstanceOf(NotFoundException.class)
                     .hasMessageContaining("User not found");
             verify(taskRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("findAll")
+    class FindAllTests {
+        @Test
+        void returnsAllTasksAsDtos() {
+            Task t2 = new Task();
+            t2.setId(2L);
+            t2.setTitle("Second Task");
+            t2.setStatus("ongoing");
+            when(taskRepository.findAll()).thenReturn(List.of(testTask, t2));
+
+            var result = taskService.findAll();
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getId()).isEqualTo(1L);
+            assertThat(result.get(0).getTitle()).isEqualTo("Test Task");
+            assertThat(result.get(0).getStatus()).isEqualTo("need_to_start");
+            assertThat(result.get(1).getId()).isEqualTo(2L);
+            assertThat(result.get(1).getTitle()).isEqualTo("Second Task");
+            assertThat(result.get(1).getStatus()).isEqualTo("ongoing");
+            verify(taskRepository).findAll();
+        }
+
+        @Test
+        void returnsEmptyListWhenNoTasks() {
+            when(taskRepository.findAll()).thenReturn(List.of());
+            assertThat(taskService.findAll()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByAssignedUser")
+    class FindByAssignedUserTests {
+        @Test
+        void returnsTasksForUser() {
+            when(taskRepository.findByAssignedToId(1L)).thenReturn(List.of(testTask));
+
+            var result = taskService.findByAssignedUser(1L);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getTitle()).isEqualTo("Test Task");
+            verify(taskRepository).findByAssignedToId(1L);
+        }
+
+        @Test
+        void returnsEmptyListWhenUserHasNoTasks() {
+            when(taskRepository.findByAssignedToId(2L)).thenReturn(List.of());
+            assertThat(taskService.findByAssignedUser(2L)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("createTask")
+    class CreateTaskTests {
+        @Test
+        void throwsWhenNotAuthenticated() {
+            CreateTaskRequest req = new CreateTaskRequest();
+            req.setTitle("New Task");
+            req.setStatus("need_to_start");
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn(null);
+                assertThatThrownBy(() -> taskService.createTask(req))
+                        .isInstanceOf(NotFoundException.class)
+                        .hasMessageContaining("Not authenticated");
+                verify(taskRepository, never()).save(any());
+            }
+        }
+
+        @Test
+        void createsTaskAssignedToCurrentUser() {
+            CreateTaskRequest req = new CreateTaskRequest();
+            req.setTitle("  New Task  ");
+            req.setStatus("ongoing");
+            req.setDueDate("2025-06-01");
+            when(taskRepository.save(any(Task.class))).thenAnswer(inv -> {
+                Task t = inv.getArgument(0);
+                t.setId(10L);
+                return t;
+            });
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+                var result = taskService.createTask(req);
+
+                assertThat(result.getId()).isEqualTo(10L);
+                assertThat(result.getTitle()).isEqualTo("New Task");
+                assertThat(result.getStatus()).isEqualTo("ongoing");
+                assertThat(result.getDueDate()).isEqualTo(LocalDate.of(2025, 6, 1));
+                ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+                verify(taskRepository).save(captor.capture());
+                assertThat(captor.getValue().getAssignedTo()).isEqualTo(testUser);
+            }
+        }
+
+        @Test
+        void throwsWhenCurrentUserNotFound() {
+            CreateTaskRequest req = new CreateTaskRequest();
+            req.setTitle("Task");
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("unknown@example.com");
+                when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+                assertThatThrownBy(() -> taskService.createTask(req))
+                        .isInstanceOf(NotFoundException.class)
+                        .hasMessageContaining("User not found");
+                verify(taskRepository, never()).save(any());
+            }
         }
     }
 }

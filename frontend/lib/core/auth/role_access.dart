@@ -15,8 +15,8 @@ class RoleAccess {
     AppRoutes.settings,
   };
 
-  /// Public route; no role required.
-  static const String publicRoute = AppRoutes.login;
+  /// Public route; no role required (login form).
+  static const String publicRoute = AppRoutes.loginForm;
 
   /// Default route after login for each role.
   static String defaultRouteForRole(AppRole role) {

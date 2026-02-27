@@ -17,14 +17,16 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(name = "login_id", unique = true)
+    private Integer loginId;
+
     @Column(name = "id_card_number")
     private String idCardNumber;
 
     @Column(nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, name = "role")
     private Role role;
 
     private String title;
@@ -35,6 +37,15 @@ public class User {
 
     @Column(name = "is_temporary")
     private boolean isTemporary = false;
+
+    @Column(name = "photo_url", length = 512)
+    private String photoUrl;
+
+    @Column(name = "age")
+    private Integer age;
+
+    @Column(name = "skills", length = 1000)
+    private String skills;
 
     @Column(name = "created_at")
     private Instant createdAt = Instant.now();
@@ -61,6 +72,8 @@ public class User {
     public void setFullName(String fullName) { this.fullName = fullName; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    public Integer getLoginId() { return loginId; }
+    public void setLoginId(Integer loginId) { this.loginId = loginId; }
     public String getIdCardNumber() { return idCardNumber; }
     public void setIdCardNumber(String idCardNumber) { this.idCardNumber = idCardNumber; }
     public String getPassword() { return password; }
@@ -78,4 +91,10 @@ public class User {
     public void setPendingOtp(String pendingOtp) { this.pendingOtp = pendingOtp; }
     public Instant getOtpExpiresAt() { return otpExpiresAt; }
     public void setOtpExpiresAt(Instant otpExpiresAt) { this.otpExpiresAt = otpExpiresAt; }
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
+    public String getSkills() { return skills; }
+    public void setSkills(String skills) { this.skills = skills; }
 }

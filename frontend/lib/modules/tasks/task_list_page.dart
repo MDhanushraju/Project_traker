@@ -24,7 +24,7 @@ class _TaskListPageState extends State<TaskListPage> {
 
   bool _canAddOrEditTasks() {
     final role = AuthState.instance.currentUser?.role;
-    return role == AppRole.member || role == AppRole.teamLeader || role == AppRole.manager;
+    return role == AppRole.admin || role == AppRole.member || role == AppRole.teamLeader || role == AppRole.manager;
   }
 
   Future<void> _showAddTaskSheet() async {

@@ -1,17 +1,18 @@
 package com.taker.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 
-@Schema(description = "Request password reset - sends captcha")
+@Schema(description = "Request password reset - send either email or 5-digit login ID; server returns verification question")
 public class ForgotPasswordRequest {
 
-    @Schema(description = "User email", requiredMode = Schema.RequiredMode.REQUIRED, example = "admin@taker.com")
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
+    @Schema(description = "User email (use either email or loginId)", example = "admin@taker.com")
     private String email;
 
+    @Schema(description = "5-digit login ID (use either email or loginId)", example = "10001")
+    private Integer loginId;
+
     public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setEmail(String email) { this.email = email != null ? email.trim().toLowerCase() : null; }
+    public Integer getLoginId() { return loginId; }
+    public void setLoginId(Integer loginId) { this.loginId = loginId; }
 }

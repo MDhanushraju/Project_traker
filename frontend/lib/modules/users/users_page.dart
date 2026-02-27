@@ -6,7 +6,7 @@ import '../../data/data_provider.dart';
 import '../../data/positions_data.dart';
 import '../../shared/layouts/main_layout.dart';
 import '../../app/app_routes.dart';
-import 'user_details_page.dart';
+import 'user_details_page.dart' show UserDetailsArgs, showPromoteDemoteSheet;
 
 enum _UserRole { admin, teamManager, teamLeader, teamMember }
 
@@ -23,6 +23,8 @@ class _UsersPageState extends State<UsersPage> {
   List<_UserItem> _teamManagers = [];
   List<_UserItem> _byPosition = [];
   bool _loading = true;
+  String? _loadError;
+  int? _backendUserCount;
 
   @override
   void initState() {
@@ -32,9 +34,12 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<void> _loadUsers() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
-      final users = await DataProvider.instance.getAllUsers();
+      final List<Map<String, dynamic>> users = await DataProvider.instance.getAllUsers();
       final managers = <_UserItem>[];
       final byPos = <_UserItem>[];
       final admins = <_UserItem>[];
@@ -45,15 +50,33 @@ class _UsersPageState extends State<UsersPage> {
         final roleStr = (u['role'] ?? '').toString().toLowerCase();
         final position = (u['position'] as String?)?.toString();
         final isTemp = u['temporary'] == true;
-        if (roleStr == 'admin') {
-          admins.add(_UserItem(id: id, name: name, title: title, role: _UserRole.admin, status: 'Active'));
-        } else if (roleStr == 'manager') {
-          managers.add(_UserItem(id: id, name: name, title: title, role: _UserRole.teamManager, status: 'Active'));
-        } else if (roleStr == 'team_leader') {
-          byPos.add(_UserItem(id: id, name: name, title: title, role: _UserRole.teamLeader, position: position, status: 'Active'));
-        } else {
-          byPos.add(_UserItem(id: id, name: name, title: title, role: _UserRole.teamMember, position: position, status: 'Active', isTemporary: isTemp));
-        }
+        final email = (u['email'] ?? '').toString();
+        final loginId = u['loginId'] is int ? u['loginId'] as int? : int.tryParse((u['loginId'] ?? '').toString());
+        final photoUrl = (u['photoUrl'] ?? '').toString();
+        final currentProject = (u['currentProject'] ?? '').toString();
+        final projectsCompleted = u['projectsCompletedCount'] is int ? u['projectsCompletedCount'] as int? : int.tryParse((u['projectsCompletedCount'] ?? '').toString());
+        final managerName = (u['managerName'] ?? '').toString();
+        final teamLeaderName = (u['teamLeaderName'] ?? '').toString();
+        final item = _UserItem(
+          id: id,
+          name: name,
+          title: title,
+          role: roleStr == 'admin' ? _UserRole.admin : roleStr == 'manager' ? _UserRole.teamManager : roleStr == 'team_leader' ? _UserRole.teamLeader : _UserRole.teamMember,
+          position: position,
+          status: 'Active',
+          isTemporary: isTemp,
+          email: email.isEmpty ? null : email,
+          loginId: loginId,
+          photoUrl: photoUrl.isEmpty ? null : photoUrl,
+          currentProject: currentProject.isEmpty ? null : currentProject,
+          projectsCompletedCount: projectsCompleted ?? 0,
+          managerName: managerName.isEmpty ? null : managerName,
+          teamLeaderName: teamLeaderName.isEmpty ? null : teamLeaderName,
+        );
+        if (roleStr == 'admin') admins.add(item);
+        else if (roleStr == 'manager') managers.add(item);
+        else if (roleStr == 'team_leader') byPos.add(item);
+        else byPos.add(item);
       }
       if (mounted) {
         setState(() {
@@ -61,11 +84,23 @@ class _UsersPageState extends State<UsersPage> {
           _teamManagers = managers;
           _byPosition = byPos;
           _loading = false;
+          _loadError = null;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e, st) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.toString().replaceFirst(RegExp(r'^Exception:?\s*'), '').split('\n').first.trim();
+        });
+      }
+      debugPrint('Users load error: $e\n$st');
     }
+  }
+
+  Future<void> _checkBackendCount() async {
+    final count = await DataProvider.instance.getUserCount();
+    if (mounted) setState(() => _backendUserCount = count);
   }
 
   @override
@@ -216,16 +251,96 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
+  void _openPromote(BuildContext context, _UserItem user) {
+    _showPermanentTemporaryChoice(context, isPromote: true).then((temporary) {
+      if (temporary == null || !mounted) return;
+      showPromoteDemoteSheet(context, user.id, _roleToApi(user.role), user.name, true, initialTemporary: temporary)
+          .then((ok) {
+        if (ok == true && mounted) _loadUsers();
+      });
+    });
+  }
+
+  void _openDemote(BuildContext context, _UserItem user) {
+    _showPermanentTemporaryChoice(context, isPromote: false).then((temporary) {
+      if (temporary == null || !mounted) return;
+      showPromoteDemoteSheet(context, user.id, _roleToApi(user.role), user.name, false, initialTemporary: temporary)
+          .then((ok) {
+        if (ok == true && mounted) _loadUsers();
+      });
+    });
+  }
+
+  /// After tapping Promotion or Demotion: choose Permanent or Temporary. Returns false = permanent, true = temporary, null = cancelled.
+  Future<bool?> _showPermanentTemporaryChoice(BuildContext context, {required bool isPromote}) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isPromote ? 'Promotion' : 'Demotion'),
+        content: const Text('Choose Permanent or Temporary for this role change.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, null), child: const Text('Cancel')),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, false),
+            icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+            label: const Text('Permanent'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.schedule_rounded, size: 20),
+            label: const Text('Temporary'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onKick(BuildContext context, _UserItem user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kick user'),
+        content: Text('Remove ${user.name} from the system? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Kick')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final (ok, errorMsg) = await DataProvider.instance.kickUserWithMessage(user.id);
+    if (mounted) {
+      if (ok) {
+        _loadUsers();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${user.name} has been removed')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(errorMsg?.isNotEmpty == true ? errorMsg! : 'Failed to kick user'),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        ));
+      }
+    }
+  }
+
   void _openDetails(BuildContext context, _UserItem user) {
     Navigator.of(context).pushNamed(
       AppRoutes.userDetails,
       arguments: UserDetailsArgs(
+        userId: user.id,
         name: user.name,
         title: user.title,
         role: user.position != null ? '${user.position} · ${_roleLabel(user.role)}' : _roleLabel(user.role),
+        roleApi: _roleToApi(user.role),
         projects: user.projects,
         status: user.status,
         isTemporary: user.isTemporary,
+        email: user.email,
+        loginId: user.loginId,
+        photoUrl: user.photoUrl,
+        currentProject: user.currentProject,
+        projectsCompletedCount: user.projectsCompletedCount,
+        managerName: user.managerName,
+        teamLeaderName: user.teamLeaderName,
       ),
     );
   }
@@ -253,11 +368,96 @@ class _UsersPageState extends State<UsersPage> {
     final positions = PositionsData.instance.positions;
     final usedPositions = _usedPositions;
     final allPositions = {...positions, ...usedPositions}.toList()..sort();
+    final hasNoUsers = _admins.isEmpty && _teamManagers.isEmpty && _byPosition.isEmpty;
 
     return MainLayout(
       title: 'Users',
       currentRoute: AppRoutes.users,
-      child: ListView(
+      child: hasNoUsers
+          ? ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Users', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    FilledButton.icon(
+                      onPressed: () => _openAddMember(context),
+                      icon: const Icon(Icons.person_add_rounded, size: 20),
+                      label: const Text('Add Member'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 48),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline_rounded, size: 64, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No users yet',
+                          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        if (_loadError != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _loadError!,
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                        if (_backendUserCount != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Database has $_backendUserCount user${_backendUserCount == 1 ? '' : 's'}. List failed to load.',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Backend must be running on http://localhost:8080. Add a member or tap Retry.',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8)),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _loadUsers,
+                              icon: const Icon(Icons.refresh_rounded, size: 20),
+                              label: const Text('Retry'),
+                            ),
+                            if (_backendUserCount == null) ...[
+                              const SizedBox(width: 12),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  await _checkBackendCount();
+                                },
+                                icon: const Icon(Icons.storage_rounded, size: 18),
+                                label: const Text('Check DB count'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : ListView(
         padding: const EdgeInsets.all(24),
         children: [
           Row(
@@ -288,12 +488,12 @@ class _UsersPageState extends State<UsersPage> {
           if (_admins.isNotEmpty) ...[
             _SectionHeader(title: 'Admins', count: _admins.length, icon: Icons.admin_panel_settings_rounded, theme: theme),
             const SizedBox(height: 12),
-            ..._admins.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+            ..._admins.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
             const SizedBox(height: 28),
           ],
           _SectionHeader(title: 'All Managers', count: _teamManagers.length, icon: Icons.badge_rounded, theme: theme),
           const SizedBox(height: 12),
-          ..._teamManagers.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+          ..._teamManagers.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
           ...allPositions.map((pos) {
             final leaders = _leadersFor(pos);
             final members = _membersFor(pos);
@@ -309,7 +509,7 @@ class _UsersPageState extends State<UsersPage> {
                     padding: const EdgeInsets.only(left: 16, bottom: 4),
                     child: Text('Team Leaders (${leaders.length})', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
                   ),
-                  ...leaders.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+                  ...leaders.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
                   const SizedBox(height: 8),
                 ],
                 if (members.isNotEmpty) ...[
@@ -317,7 +517,7 @@ class _UsersPageState extends State<UsersPage> {
                     padding: const EdgeInsets.only(left: 16, bottom: 4),
                     child: Text('Team Members (${members.length})', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
                   ),
-                  ...members.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+                  ...members.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
                 ],
               ],
             );
@@ -336,7 +536,7 @@ class _UsersPageState extends State<UsersPage> {
                 padding: const EdgeInsets.only(left: 16, bottom: 4),
                 child: Text('Team Leaders (${_noPositionLeaders.length})', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
               ),
-              ..._noPositionLeaders.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+              ..._noPositionLeaders.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
               const SizedBox(height: 8),
             ],
             if (_noPositionMembers.isNotEmpty) ...[
@@ -344,7 +544,7 @@ class _UsersPageState extends State<UsersPage> {
                 padding: const EdgeInsets.only(left: 16, bottom: 4),
                 child: Text('Team Members (${_noPositionMembers.length})', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary)),
               ),
-              ..._noPositionMembers.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u))),
+              ..._noPositionMembers.map((u) => _UserCard(user: u, theme: theme, onDetails: () => _openDetails(context, u), onAssignRole: () => _openAssignRole(context, u), isAdminViewer: isAdmin, isManagerViewer: AuthState.instance.currentUser?.role == AppRole.manager, onKick: () => _onKick(context, u), onPromote: () => _openPromote(context, u), onDemote: () => _openDemote(context, u))),
             ],
           ],
           const SizedBox(height: 24),
@@ -364,6 +564,13 @@ class _UserItem {
     this.projects = const [],
     this.status = 'Active',
     this.isTemporary = false,
+    this.email,
+    this.loginId,
+    this.photoUrl,
+    this.currentProject,
+    this.projectsCompletedCount = 0,
+    this.managerName,
+    this.teamLeaderName,
   });
 
   final int id;
@@ -374,6 +581,13 @@ class _UserItem {
   final List<String> projects;
   final String status;
   final bool isTemporary;
+  final String? email;
+  final int? loginId;
+  final String? photoUrl;
+  final String? currentProject;
+  final int projectsCompletedCount;
+  final String? managerName;
+  final String? teamLeaderName;
 }
 
 class _AddMemberSheet extends StatefulWidget {
@@ -648,16 +862,57 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+enum _UserCardAction { message, details, kick, promote, demote }
+
 class _UserCard extends StatelessWidget {
-  const _UserCard({required this.user, required this.theme, required this.onDetails, required this.onAssignRole});
+  const _UserCard({
+    required this.user,
+    required this.theme,
+    required this.onDetails,
+    required this.onAssignRole,
+    this.isAdminViewer = false,
+    this.isManagerViewer = false,
+    this.onKick,
+    this.onPromote,
+    this.onDemote,
+  });
 
   final _UserItem user;
   final ThemeData theme;
   final VoidCallback onDetails;
   final VoidCallback onAssignRole;
+  final bool isAdminViewer;
+  final bool isManagerViewer;
+  final VoidCallback? onKick;
+  final VoidCallback? onPromote;
+  final VoidCallback? onDemote;
+
+  /// Kick: only Admin and Manager. Admin can kick non-admins; Manager can kick Team Leader or Team Member.
+  bool get _canKick =>
+      onKick != null &&
+      ((isAdminViewer && user.role != _UserRole.admin) ||
+          (isManagerViewer && (user.role == _UserRole.teamLeader || user.role == _UserRole.teamMember)));
+
+  /// Promotion and Demotion (with Permanent/Temporary): only Admin and Manager see them. Not shown for Admin users (head cannot be promoted/demoted).
+  bool get _showPD =>
+      (isAdminViewer || isManagerViewer) &&
+      user.role != _UserRole.admin &&
+      onPromote != null &&
+      onDemote != null;
 
   @override
   Widget build(BuildContext context) {
+    final roleLabel = user.role == _UserRole.admin ? 'Admin' : user.role == _UserRole.teamManager ? 'Manager' : user.role == _UserRole.teamLeader ? 'Team Leader' : 'Team Member';
+    final idLine = user.loginId != null ? 'ID: ${user.loginId}' : '';
+    final emailLine = user.email != null && user.email!.isNotEmpty ? user.email! : '';
+    final subtitle = [if (roleLabel.isNotEmpty) roleLabel, if (idLine.isNotEmpty) idLine, if (emailLine.isNotEmpty) emailLine].join(' · ');
+    final items = <PopupMenuEntry<_UserCardAction>>[
+      const PopupMenuItem(value: _UserCardAction.message, child: ListTile(leading: Icon(Icons.message_rounded, size: 20), title: Text('Message'), dense: true)),
+      const PopupMenuItem(value: _UserCardAction.details, child: ListTile(leading: Icon(Icons.person_rounded, size: 20), title: Text('Details'), dense: true)),
+      if (_canKick) const PopupMenuItem(value: _UserCardAction.kick, child: ListTile(leading: Icon(Icons.person_remove_rounded, size: 20), title: Text('Kick'), dense: true)),
+      if (_showPD) const PopupMenuItem(value: _UserCardAction.promote, child: ListTile(leading: Icon(Icons.arrow_upward_rounded, size: 20), title: Text('Promotion'), dense: true)),
+      if (_showPD) const PopupMenuItem(value: _UserCardAction.demote, child: ListTile(leading: Icon(Icons.arrow_downward_rounded, size: 20), title: Text('Demotion'), dense: true)),
+    ];
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -665,31 +920,51 @@ class _UserCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
+          radius: 24,
           backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(user.name.split(' ').map((w) => w[0]).take(2).join(), style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
+          backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+              ? NetworkImage(user.photoUrl!)
+              : null,
+          child: user.photoUrl == null || user.photoUrl!.isEmpty
+              ? Text(user.name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(), style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600, fontSize: 14))
+              : null,
         ),
         title: Text(user.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
         subtitle: Text(
-          user.isTemporary ? '${user.title} (Temporary)' : user.title,
+          subtitle.isEmpty ? (user.isTemporary ? 'Temporary' : user.title) : subtitle,
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            OutlinedButton.icon(
-              onPressed: onAssignRole,
-              icon: const Icon(Icons.badge_rounded, size: 18),
-              label: const Text('Assign Role'),
+            PopupMenuButton<_UserCardAction>(
+              icon: const Icon(Icons.more_vert_rounded),
+              tooltip: 'Actions',
+              itemBuilder: (_) => items,
+              onSelected: (action) {
+                switch (action) {
+                  case _UserCardAction.message:
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Message ${user.name}')));
+                    break;
+                  case _UserCardAction.details:
+                    onDetails();
+                    break;
+                  case _UserCardAction.kick:
+                    onKick?.call();
+                    break;
+                  case _UserCardAction.promote:
+                    onPromote?.call();
+                    break;
+                  case _UserCardAction.demote:
+                    onDemote?.call();
+                    break;
+                }
+              },
             ),
             const SizedBox(width: 8),
-            OutlinedButton(onPressed: onDetails, child: const Text('Details')),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Message ${user.name}'))),
-              icon: const Icon(Icons.message_rounded, size: 18),
-              label: const Text('Message'),
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-            ),
+            FilledButton(onPressed: onDetails, child: const Text('Details')),
           ],
         ),
       ),

@@ -16,6 +16,24 @@ public class UserSummaryDto {
     private String position;
     @Schema(example = "false")
     private Boolean temporary;
+    @Schema(example = "admin@taker.com")
+    private String email;
+    @Schema(example = "10001")
+    private Integer loginId;
+    @Schema(example = "https://example.com/photo.jpg")
+    private String photoUrl;
+    @Schema(example = "28")
+    private Integer age;
+    @Schema(example = "Java, React, SQL")
+    private String skills;
+    @Schema(example = "Project Alpha")
+    private String currentProject;
+    @Schema(example = "3")
+    private Integer projectsCompletedCount;
+    @Schema(example = "Sarah Jenkins")
+    private String managerName;
+    @Schema(example = "Marcus Thorne")
+    private String teamLeaderName;
 
     public Long getId() {
         return id;
@@ -64,4 +82,23 @@ public class UserSummaryDto {
     public void setTemporary(Boolean temporary) {
         this.temporary = temporary;
     }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public Integer getLoginId() { return loginId; }
+    public void setLoginId(Integer loginId) { this.loginId = loginId; }
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
+    public String getSkills() { return skills; }
+    public void setSkills(String skills) { this.skills = skills; }
+    public String getCurrentProject() { return currentProject; }
+    public void setCurrentProject(String currentProject) { this.currentProject = currentProject; }
+    public Integer getProjectsCompletedCount() { return projectsCompletedCount; }
+    public void setProjectsCompletedCount(Integer projectsCompletedCount) { this.projectsCompletedCount = projectsCompletedCount; }
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
+    public String getTeamLeaderName() { return teamLeaderName; }
+    public void setTeamLeaderName(String teamLeaderName) { this.teamLeaderName = teamLeaderName; }
 }

@@ -1,21 +1,26 @@
 package com.taker.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
-@Schema(description = "Reset password with token from verify-captcha")
+@Schema(description = "Reset password: same email as forgot-password + captcha answer (e.g. 10 for \"2 + 8\") + new password")
 public class ResetPasswordRequest {
 
-    @Schema(description = "New password (min 8 chars, 1 number, 1 special)", requiredMode = Schema.RequiredMode.REQUIRED, example = "NewPass@1")
-    @NotBlank(message = "New password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
+    @Schema(description = "User email (same as in forgot-password)", requiredMode = Schema.RequiredMode.REQUIRED, example = "admin@taker.com")
+    private String email;
+
+    @Schema(description = "Answer to the math question (e.g. 10 for \"What is 2 + 8?\")", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
+    private String captchaAnswer;
+
+    @Schema(description = "New password", requiredMode = Schema.RequiredMode.REQUIRED, example = "NewPass@1")
     private String newPassword;
 
     @Schema(description = "Confirm new password", requiredMode = Schema.RequiredMode.REQUIRED, example = "NewPass@1")
-    @NotBlank(message = "Confirm password is required")
     private String confirmPassword;
 
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email != null ? email.trim().toLowerCase() : null; }
+    public String getCaptchaAnswer() { return captchaAnswer; }
+    public void setCaptchaAnswer(String captchaAnswer) { this.captchaAnswer = captchaAnswer; }
     public String getNewPassword() { return newPassword; }
     public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
     public String getConfirmPassword() { return confirmPassword; }

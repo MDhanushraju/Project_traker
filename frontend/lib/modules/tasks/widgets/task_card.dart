@@ -55,6 +55,20 @@ class TaskCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if ((task.assigneeName ?? '').isNotEmpty || (task.projectName ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          if ((task.assigneeName ?? '').isNotEmpty) 'Assigned to ${task.assigneeName}',
+                          if ((task.projectName ?? '').isNotEmpty) 'Project: ${task.projectName}',
+                        ].join(' · '),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [

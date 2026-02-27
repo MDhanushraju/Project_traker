@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/auth/auth_exception.dart';
+import '../../../core/network/api_config.dart';
 import 'auth_theme.dart';
 
-/// Reset Password: enter new password and confirm.
+/// Reset Password: enter verification answer (when coming from forgot), then new password and confirm.
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
 
@@ -16,6 +18,7 @@ class ResetPasswordPage extends StatefulWidget {
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
+  final _answerController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
@@ -26,8 +29,19 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   static final _passwordRegex =
       RegExp(r'^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$');
 
+  Map<String, dynamic> get _args {
+    final a = ModalRoute.of(context)?.settings.arguments;
+    if (a is Map) return Map<String, dynamic>.from(a);
+    return {};
+  }
+
+  String get _captchaQuestion => (_args['captchaQuestion'] ?? '').toString();
+
+  bool get _showVerificationSection => _captchaQuestion.isNotEmpty;
+
   @override
   void dispose() {
+    _answerController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -43,24 +57,36 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
-    final args = ModalRoute.of(context)?.settings.arguments;
-    final token = (args is Map ? args['resetToken'] : null)?.toString();
-    if (token == null || token.isEmpty) {
+    final email = _args['email']?.toString();
+    final captchaAnswerFromArgs = _args['captchaAnswer']?.toString();
+    final captchaAnswer = _showVerificationSection
+        ? _answerController.text.trim()
+        : captchaAnswerFromArgs;
+    if (email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Session expired. Please start over.')),
+        const SnackBar(content: Text('Session expired. Please start from Forgot password again.')),
       );
-      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.loginForm, (_) => false);
+      return;
+    }
+    if (captchaAnswer == null || captchaAnswer.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the verification answer.')),
+      );
+      return;
+    }
+    if (apisHandicapped) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('APIs are disabled.')));
       return;
     }
     setState(() => _isLoading = true);
     try {
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        headers: {'Authorization': 'Bearer $token'},
-      ));
+      final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
       final res = await dio.post<Map<String, dynamic>>(
         '/api/auth/reset-password',
         data: {
+          'email': email,
+          'captchaAnswer': captchaAnswer,
           'newPassword': _passwordController.text,
           'confirmPassword': _confirmController.text,
         },
@@ -74,7 +100,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         const SnackBar(content: Text('Password reset successfully. Please log in.')),
       );
       Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.login,
+        AppRoutes.loginForm,
         (route) => false,
       );
     } on DioException catch (e) {
@@ -145,13 +171,57 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Enter your new password below to secure your Taker account.',
+                          _showVerificationSection
+                              ? 'Enter the answer to the question below, then set your new password.'
+                              : 'Enter your new password below to secure your Taker account.',
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
                               ?.copyWith(color: AuthTheme.textSecondary(context)),
                         ),
-                        const SizedBox(height: 28),
+                        if (_showVerificationSection) ...[
+                          const SizedBox(height: 20),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AuthTheme.primaryBlue.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AuthTheme.primaryBlue.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              _captchaQuestion,
+                              style: TextStyle(
+                                color: AuthTheme.primaryBlue,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _answerController,
+                            style: TextStyle(color: AuthTheme.textPrimary(context), fontSize: 18),
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Enter the answer to the question above';
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'Your answer',
+                              hintText: 'e.g. 10',
+                              prefixIcon: Icon(Icons.pin_outlined, color: AuthTheme.textSecondary(context), size: 22),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        SizedBox(height: _showVerificationSection ? 0 : 20),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,

@@ -1,2 +1,1 @@
-org.springframework.context.ApplicationContextInitializer=\
-com.taker.auth.config.DatabaseUrlInitializer
+# Optional: add ApplicationContextInitializer entries here if needed

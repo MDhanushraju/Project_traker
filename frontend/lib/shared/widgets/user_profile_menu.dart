@@ -65,7 +65,7 @@ class _UserProfileMenuState extends State<UserProfileMenu> {
           _hideMenu();
           await AuthService.instance.logout();
           if (!context.mounted) return;
-          nav.pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+          nav.pushNamedAndRemoveUntil(AppRoutes.loginForm, (_) => false);
         },
       ),
     );

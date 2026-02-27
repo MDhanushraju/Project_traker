@@ -122,7 +122,7 @@ class Sidebar extends StatelessWidget {
                   await AuthService.instance.logout();
                   if (!context.mounted) return;
                   Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.login,
+                    AppRoutes.loginForm,
                     (_) => false,
                   );
                 },

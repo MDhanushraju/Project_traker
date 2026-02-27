@@ -13,8 +13,13 @@ public class AssignRoleRequest {
     @Schema(description = "Position for team_leader/member: Developer, Tester, Designer, Analyst", example = "Tester")
     private String position;
 
+    @Schema(description = "Mark this role as temporary", example = "false")
+    private Boolean temporary;
+
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
     public String getPosition() { return position; }
     public void setPosition(String position) { this.position = position; }
+    public Boolean getTemporary() { return temporary; }
+    public void setTemporary(Boolean temporary) { this.temporary = temporary; }
 }

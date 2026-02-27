@@ -1,23 +1,27 @@
+# PostgreSQL database
 server:
-  port: ${PORT:10000}
+  port: 8080
+  address: 0.0.0.0
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/springboot_db
+    username: postgres
+    password: Dhanush@03
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
+    show-sql: true
+    open-in-view: false
     properties:
       hibernate:
         format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: Zx9!Lk@pQ2#nS8mVYtR5WcD1E7A4
   expiration-ms: 86400000
   reset-expiration-ms: 900000
 

@@ -18,7 +18,7 @@ WORKDIR /app
 
 COPY --from=build /app/build/libs/*.jar app.jar
 
+# Match application.yml default (8080); Render sets PORT at runtime
 EXPOSE 8080
 
-# PORT for Render (Render sets PORT env var)
 ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS:--Xmx256m} -Dserver.port=${PORT:-8080} -jar app.jar"]
