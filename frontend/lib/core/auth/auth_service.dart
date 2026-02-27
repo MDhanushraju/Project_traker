@@ -56,7 +56,8 @@ class AuthService {
     await _tokens.setToken(token);
     await _tokens.setStoredRole(roleStr);
     final role = _parseRole(roleStr);
-    if (role != null) _auth.login(role);
+    final displayName = response['fullName']?.toString();
+    if (role != null) _auth.login(role, displayName: displayName);
   }
 
   /// Sign up via API. On success returns user info including [loginId] (5-digit ID).

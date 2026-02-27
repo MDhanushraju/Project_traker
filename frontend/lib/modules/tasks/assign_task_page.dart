@@ -331,6 +331,8 @@ class _AssignTaskPageState extends State<AssignTaskPage> {
     );
     if (!mounted) return;
     if (ok) {
+      // Refresh tasks so lists update immediately when returning.
+      await MockData.refreshFromApi();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Task "$taskTitle" assigned to $_selectedUser')),
       );

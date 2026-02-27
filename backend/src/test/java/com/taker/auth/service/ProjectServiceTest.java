@@ -2,6 +2,7 @@ package com.taker.auth.service;
 
 import com.taker.auth.dto.ProjectDto;
 import com.taker.auth.entity.Project;
+import com.taker.auth.exception.NotFoundException;
 import com.taker.auth.repository.ProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.anyLong;
 
 @ExtendWith(MockitoExtension.class)
 class ProjectServiceTest {
@@ -26,6 +29,11 @@ class ProjectServiceTest {
 
     @InjectMocks
     private ProjectService projectService;
+
+    @BeforeEach
+    void setUp() {
+        // no-op for now
+    }
 
     @Nested
     @DisplayName("findAll")
@@ -60,6 +68,29 @@ class ProjectServiceTest {
             assertThat(result.get(1).getStatus()).isEqualTo("Completed");
             assertThat(result.get(1).getProgress()).isEqualTo(100);
             verify(projectRepository).findAll();
+        }
+    }
+
+    @Nested
+    @DisplayName("delete")
+    class DeleteTests {
+        @Test
+        void deletesExistingProject() {
+            when(projectRepository.existsById(1L)).thenReturn(true);
+
+            projectService.delete(1L);
+
+            verify(projectRepository).deleteById(1L);
+        }
+
+        @Test
+        void throwsWhenProjectNotFound() {
+            when(projectRepository.existsById(99L)).thenReturn(false);
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> projectService.delete(99L))
+                    .isInstanceOf(NotFoundException.class)
+                    .hasMessageContaining("Project not found");
+            verify(projectRepository, never()).deleteById(anyLong());
         }
     }
 }

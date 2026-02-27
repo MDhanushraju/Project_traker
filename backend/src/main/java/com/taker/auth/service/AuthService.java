@@ -8,6 +8,7 @@ import com.taker.auth.exception.AuthException;
 import com.taker.auth.exception.UnauthorizedException;
 import com.taker.auth.repository.PositionRepository;
 import com.taker.auth.repository.UserRepository;
+import com.taker.auth.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +19,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PositionRepository positionRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public AuthService(UserRepository userRepository,
                        PositionRepository positionRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
         this.userRepository = userRepository;
         this.positionRepository = positionRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     /**
@@ -70,7 +74,8 @@ public class AuthService {
         String userEmail = user.getEmail() != null ? user.getEmail() : email;
         String fullName = user.getFullName() != null ? user.getFullName() : email;
         String positionName = user.getPosition() != null ? user.getPosition().getName() : null;
-        return new AuthResponse(user.getId(), user.getLoginId(), "", roleName, userEmail, fullName, positionName);
+        String token = jwtService.generateToken(userEmail, roleName);
+        return new AuthResponse(user.getId(), user.getLoginId(), token, roleName, userEmail, fullName, positionName);
     }
 
     /**
@@ -128,7 +133,8 @@ public class AuthService {
         Role savedRole = user.getRole() != null ? user.getRole() : role;
         String roleName = savedRole.name().toLowerCase();
         String positionName = user.getPosition() != null ? user.getPosition().getName() : null;
-        return new AuthResponse(user.getId(), user.getLoginId(), "", roleName, user.getEmail(), user.getFullName(), positionName);
+        String token = jwtService.generateToken(user.getEmail(), roleName);
+        return new AuthResponse(user.getId(), user.getLoginId(), token, roleName, user.getEmail(), user.getFullName(), positionName);
     }
 
     /** Generates a unique 5-digit login ID (10000–99999). */
@@ -168,7 +174,8 @@ public class AuthService {
             String email = user.getEmail() != null ? user.getEmail() : "";
             String fullName = user.getFullName() != null ? user.getFullName() : "";
             String positionName = user.getPosition() != null ? user.getPosition().getName() : null;
-            return new AuthResponse(user.getId(), user.getLoginId(), "", roleName, email, fullName, positionName);
+            String token = jwtService.generateToken(email, roleName);
+            return new AuthResponse(user.getId(), user.getLoginId(), token, roleName, email, fullName, positionName);
         } catch (AuthException e) {
             throw e;
         } catch (Exception e) {

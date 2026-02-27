@@ -9,6 +9,7 @@ class TaskModel {
     this.assigneeName,
     this.projectId,
     this.projectName,
+    this.description,
   });
 
   final String? id;
@@ -19,4 +20,5 @@ class TaskModel {
   final String? assigneeName;
   final int? projectId;
   final String? projectName;
+  final String? description;
 }

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
 @Service
@@ -22,8 +24,18 @@ public class JwtService {
     @Value("${jwt.reset-expiration-ms:900000}")
     private long resetExpirationMs;
 
+    /**
+     * Builds an HMAC-SHA256 key with at least 256 bits as required by RFC 7518.
+     * Derives 32 bytes from the configured secret via SHA-256 so any secret length is safe.
+     */
     private SecretKey getSigningKey() {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes;
+        try {
+            keyBytes = MessageDigest.getInstance("SHA-256").digest(secretBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 

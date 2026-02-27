@@ -9,6 +9,7 @@ import '../../../shared/animations/fade_in.dart';
 import '../../../shared/layouts/main_layout.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../app/app_routes.dart';
+import 'models/task_model.dart';
 import 'widgets/task_card.dart';
 
 /// Task list screen. Loads from API.
@@ -19,8 +20,21 @@ class TaskListPage extends StatefulWidget {
   State<TaskListPage> createState() => _TaskListPageState();
 }
 
+/// Bucket task status into one of: need_to_start, ongoing, completed.
+String _columnStatus(String? s) {
+  if (s == null || s.isEmpty) return TaskStatus.needToStart;
+  final lower = s.toLowerCase();
+  if (lower.contains('ongoing') || lower == 'in_progress') return TaskStatus.ongoing;
+  if (lower.contains('complete') || lower == 'done') return TaskStatus.completed;
+  return TaskStatus.needToStart;
+}
+
+/// Max tasks to show per status page (remove "fake" clutter; show only a few).
+const int _kMaxTasksPerPage = 3;
+
 class _TaskListPageState extends State<TaskListPage> {
-  String _filter = 'all';
+  /// Current page filter: null = All, or one of needToStart, ongoing, completed.
+  String? _statusFilter;
 
   bool _canAddOrEditTasks() {
     final role = AuthState.instance.currentUser?.role;
@@ -29,9 +43,10 @@ class _TaskListPageState extends State<TaskListPage> {
 
   Future<void> _showAddTaskSheet() async {
     final controller = TextEditingController();
+    final descriptionController = TextEditingController();
     final statusNotifier = ValueNotifier<String>(TaskStatus.needToStart);
     final addingNotifier = ValueNotifier<bool>(false);
-    final result = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<(bool, TaskModel?)>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => ValueListenableBuilder<bool>(
@@ -58,6 +73,18 @@ class _TaskListPageState extends State<TaskListPage> {
                     autofocus: true,
                     enabled: !adding,
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description (optional)',
+                      hintText: 'Add more details about the task',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                    maxLines: 3,
+                    enabled: !adding,
+                  ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: status,
@@ -70,7 +97,7 @@ class _TaskListPageState extends State<TaskListPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: adding ? null : () => Navigator.pop(ctx, false),
+                          onPressed: adding ? null : () => Navigator.pop(ctx, (false, null)),
                           child: const Text('Cancel'),
                         ),
                       ),
@@ -82,14 +109,16 @@ class _TaskListPageState extends State<TaskListPage> {
                               : () async {
                                   final title = controller.text.trim();
                                   if (title.isEmpty) return;
+                                  final desc = descriptionController.text.trim();
                                   addingNotifier.value = true;
-                                  final (ok, errorMsg) = await DataProvider.instance.createTaskWithMessage(
+                                  final (ok, errorMsg, createdTask) = await DataProvider.instance.createTaskWithMessage(
                                     title: title,
                                     status: status,
+                                    description: desc.isEmpty ? null : desc,
                                   );
                                   if (ctx.mounted) {
                                     addingNotifier.value = false;
-                                    Navigator.pop(ctx, ok);
+                                    Navigator.pop(ctx, (ok, createdTask));
                                     if (!ok && errorMsg != null) {
                                       ScaffoldMessenger.of(ctx).showSnackBar(
                                         SnackBar(
@@ -118,7 +147,8 @@ class _TaskListPageState extends State<TaskListPage> {
         ),
       ),
     );
-    if (result == true && mounted) {
+    if (result != null && result.$1 && mounted) {
+      if (result.$2 != null) MockData.prependTask(result.$2!);
       await MockData.refreshFromApi();
       setState(() {});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task added')));
@@ -126,26 +156,35 @@ class _TaskListPageState extends State<TaskListPage> {
   }
 
   Future<void> _updateStatus(String taskId, String status) async {
-    final ok = await DataProvider.instance.updateTaskStatus(taskId: taskId, status: status);
+    if (taskId.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task ID missing; cannot update')));
+      return;
+    }
+    final (ok, msg) = await DataProvider.instance.updateTaskStatusWithMessage(taskId: taskId, status: status);
     if (ok && mounted) {
-      // Optimistically update: refresh data then rebuild so status label under title updates quickly.
       await MockData.refreshFromApi();
       setState(() {});
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update status')),
+        SnackBar(content: Text(msg ?? 'Failed to update status')),
       );
     }
   }
 
   Future<void> _deleteTask(String taskId) async {
-    final ok = await DataProvider.instance.deleteTask(taskId);
+    if (taskId.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task ID missing; cannot delete')));
+      return;
+    }
+    final (ok, msg) = await DataProvider.instance.deleteTaskWithMessage(taskId);
     if (ok && mounted) {
       await MockData.refreshFromApi();
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task deleted')));
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg ?? 'Failed to delete')),
+      );
     }
   }
 
@@ -189,18 +228,26 @@ class _TaskListPageState extends State<TaskListPage> {
         ),
       );
     }
-    var tasks = MockData.tasks;
-    if (_filter != 'all') {
-      tasks = tasks.where((t) {
-        final s = t.status ?? '';
-        if (_filter == TaskStatus.needToStart) return s == TaskStatus.needToStart || s == TaskStatus.todo || s == TaskStatus.yetToStart;
-        if (_filter == TaskStatus.ongoing) return s == TaskStatus.ongoing || s == TaskStatus.inProgress;
-        if (_filter == TaskStatus.completed) return s == TaskStatus.completed || s == TaskStatus.done;
-        return s == _filter;
-      }).toList();
-    }
-
+    final allTasks = MockData.tasks;
     final canEdit = _canAddOrEditTasks();
+
+    // Filter by selected status (page). Only real API data – no fake tasks.
+    List<TaskModel> filtered;
+    String pageTitle;
+    if (_statusFilter == null) {
+      filtered = allTasks;
+      pageTitle = 'All tasks';
+    } else {
+      filtered = allTasks.where((t) => _columnStatus(t.status) == _statusFilter).toList();
+      pageTitle = _statusFilter == TaskStatus.needToStart
+          ? 'Yet to start'
+          : _statusFilter == TaskStatus.ongoing
+              ? 'Ongoing'
+              : 'Completed';
+    }
+    // Show only 3 tasks per page (remove clutter).
+    final displayed = filtered.take(_kMaxTasksPerPage).toList();
+
     return MainLayout(
       title: 'Tasks',
       currentRoute: AppRoutes.tasks,
@@ -212,76 +259,86 @@ class _TaskListPageState extends State<TaskListPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: FadeIn(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _FilterChip(
-                            label: 'All',
-                            selected: _filter == 'all',
-                            onTap: () => setState(() => _filter = 'all'),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Need to Start',
-                            selected: _filter == TaskStatus.needToStart,
-                            onTap: () => setState(() => _filter = TaskStatus.needToStart),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Ongoing',
-                            selected: _filter == TaskStatus.ongoing,
-                            onTap: () => setState(() => _filter = TaskStatus.ongoing),
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
-                            label: 'Completed',
-                            selected: _filter == TaskStatus.completed,
-                            onTap: () => setState(() => _filter = TaskStatus.completed),
-                          ),
-                        ],
-                      ),
+                FadeIn(
+                  child: Text(
+                    '${allTasks.length} task${allTasks.length == 1 ? '' : 's'}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: () async {
-                          await MockData.refreshFromApi();
-                          if (mounted) setState(() {});
-                        },
-                        icon: const Icon(Icons.refresh_rounded),
-                        tooltip: 'Refresh tasks',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: () async {
+                        await MockData.refreshFromApi();
+                        if (mounted) setState(() {});
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                      tooltip: 'Refresh tasks',
+                    ),
+                    if (canEdit) ...[
+                      const SizedBox(width: 4),
+                      FilledButton(
+                        onPressed: _showAddTaskSheet,
+                        child: const Text('Add (to me)'),
                       ),
-                      if (canEdit) ...[
-                        const SizedBox(width: 4),
-                        FilledButton(
-                          onPressed: _showAddTaskSheet,
-                          child: const Text('Add (to me)'),
-                        ),
-                        const SizedBox(width: 6),
-                        OutlinedButton(
-                          onPressed: () {
-                            Navigator.of(context).pushNamed(AppRoutes.assignTask);
-                          },
-                          child: const Text('Assign to member'),
-                        ),
-                      ],
+                      const SizedBox(width: 6),
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed(AppRoutes.assignTask);
+                        },
+                        child: const Text('Assign to member'),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          // 4 buttons: All, Yet to start, Ongoing, Completed – click to go to that page.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _PageButton(
+                    label: 'All',
+                    selected: _statusFilter == null,
+                    onTap: () => setState(() => _statusFilter = null),
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _PageButton(
+                    label: 'Yet to start',
+                    selected: _statusFilter == TaskStatus.needToStart,
+                    onTap: () => setState(() => _statusFilter = TaskStatus.needToStart),
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _PageButton(
+                    label: 'Ongoing',
+                    selected: _statusFilter == TaskStatus.ongoing,
+                    onTap: () => setState(() => _statusFilter = TaskStatus.ongoing),
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _PageButton(
+                    label: 'Completed',
+                    selected: _statusFilter == TaskStatus.completed,
+                    onTap: () => setState(() => _statusFilter = TaskStatus.completed),
+                    theme: theme,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Expanded(
-            child: tasks.isEmpty && MockData.lastError != null
+            child: allTasks.isEmpty && MockData.lastError != null
                 ? EmptyState(
                     icon: Icons.cloud_off_rounded,
                     title: 'Could not load tasks',
@@ -292,11 +349,13 @@ class _TaskListPageState extends State<TaskListPage> {
                       if (mounted) setState(() {});
                     },
                   )
-                : tasks.isEmpty
+                : displayed.isEmpty
                     ? EmptyState(
                         icon: Icons.task_alt_rounded,
-                        title: 'No tasks',
-                        subtitle: 'No tasks match this filter. Tap Refresh above or add a task.',
+                        title: pageTitle,
+                        subtitle: _statusFilter == null
+                            ? 'No tasks. Tap Refresh or add a task.'
+                            : 'No tasks in "$pageTitle". Add one or choose another page.',
                         actionLabel: canEdit ? 'Add task' : 'Refresh',
                         onAction: canEdit ? _showAddTaskSheet : () async {
                           await MockData.refreshFromApi();
@@ -304,33 +363,44 @@ class _TaskListPageState extends State<TaskListPage> {
                         },
                       )
                     : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    children: [
-                      FadeIn(
-                        child: Text(
-                          '${tasks.length} task${tasks.length == 1 ? '' : 's'}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ...tasks.map(
-                        (t) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: FadeIn(
-                            child: TaskCard(
-                              task: t,
-                              canEdit: canEdit,
-                              onStatusChange: canEdit ? (s) => _updateStatus(t.id ?? '', s) : null,
-                              onDelete: canEdit ? () => _deleteTask(t.id ?? '') : null,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              pageTitle,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        ),
+                          ...displayed.map(
+                            (t) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: FadeIn(
+                                child: TaskCard(
+                                  task: t,
+                                  canEdit: canEdit,
+                                  onStatusChange: canEdit ? (s) => _updateStatus(t.id ?? '', s) : null,
+                                  onDelete: canEdit ? () => _deleteTask(t.id ?? '') : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (filtered.length > _kMaxTasksPerPage)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Showing ${displayed.length} of ${filtered.length}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 24),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
           ),
         ],
       ),
@@ -338,31 +408,28 @@ class _TaskListPageState extends State<TaskListPage> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+class _PageButton extends StatelessWidget {
+  const _PageButton({
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.theme,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: theme.colorScheme.primaryContainer,
-      checkmarkColor: theme.colorScheme.onPrimaryContainer,
-      side: BorderSide(
-        color: selected
-            ? theme.colorScheme.primary
-            : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+    return FilledButton.tonal(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        backgroundColor: selected ? theme.colorScheme.primaryContainer : null,
+        foregroundColor: selected ? theme.colorScheme.onPrimaryContainer : null,
       ),
+      child: Text(label),
     );
   }
 }

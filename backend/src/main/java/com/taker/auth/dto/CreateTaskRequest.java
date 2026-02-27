@@ -16,6 +16,9 @@ public class CreateTaskRequest {
     @Schema(description = "Due date (yyyy-MM-dd)", example = "2025-03-15")
     private String dueDate;
 
+    @Schema(description = "Optional description / details for the task", example = "Check edge cases and write report")
+    private String description;
+
     @Schema(description = "Optional user ID to assign to; null = current user", example = "3")
     private Long assignedToId;
 
@@ -28,6 +31,8 @@ public class CreateTaskRequest {
     public void setStatus(String status) { this.status = status; }
     public String getDueDate() { return dueDate; }
     public void setDueDate(String dueDate) { this.dueDate = dueDate; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public Long getAssignedToId() { return assignedToId; }
     public void setAssignedToId(Long assignedToId) { this.assignedToId = assignedToId; }
     public Long getProjectId() { return projectId; }

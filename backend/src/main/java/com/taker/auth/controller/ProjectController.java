@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +44,13 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<ApiResponse<ProjectDto>> create(@Valid @RequestBody CreateProjectRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Project created", projectService.create(request)));
+    }
+
+    @Operation(summary = "Delete project", description = "Delete project by ID. Also removes its tasks and assignments.")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@Parameter(description = "Project ID") @PathVariable Long id) {
+        projectService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Get project team", description = "Returns project team: manager, team leader(s), team member(s) with roles and photos.")

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../../../data/data_provider.dart';
 import '../../../data/mock_data.dart';
 import '../../../shared/animations/fade_in.dart';
 import '../../../shared/layouts/main_layout.dart';
@@ -148,12 +148,70 @@ class _ProjectListPageState extends State<ProjectListPage> {
             (p) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: FadeIn(
-                child: ProjectCard(
-                  project: p,
-                  onTap: () => Navigator.of(context).pushNamed(
-                    AppRoutes.teamOverview,
-                    arguments: p.id,
-                  ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ProjectCard(
+                        project: p,
+                        onTap: (p.id != null && p.id!.isNotEmpty)
+                            ? () => Navigator.of(context).pushNamed(
+                                  AppRoutes.teamOverview,
+                                  arguments: p.id!,
+                                )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Delete project',
+                      icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete project'),
+                            content: Text('Are you sure you want to delete "${p.name ?? 'this project'}"? This will also remove its tasks and assignments.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.error,
+                                  foregroundColor: theme.colorScheme.onError,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                        // p.id is String? from API; parse to int for delete.
+                        final int? projectId = p.id != null && p.id!.isNotEmpty
+                            ? int.tryParse(p.id!)
+                            : null;
+                        if (projectId == null) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invalid project id; cannot delete')),
+                          );
+                          return;
+                        }
+                        final ok = await DataProvider.instance.deleteProject(projectId);
+                        if (!mounted) return;
+                        if (ok) {
+                          await _refreshProjects();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Project "${p.name}" deleted')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to delete project')),
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),

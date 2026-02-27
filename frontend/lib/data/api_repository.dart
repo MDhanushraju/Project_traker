@@ -261,6 +261,7 @@ class ApiRepository {
     String? dueDate,
     int? assignedToId,
     int? projectId,
+    String? description,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -269,6 +270,7 @@ class ApiRepository {
         if (dueDate != null) 'dueDate': dueDate,
         if (assignedToId != null) 'assignedToId': assignedToId,
         if (projectId != null) 'projectId': projectId,
+        if (description != null && description.isNotEmpty) 'description': description,
       };
       await _client.post('/api/tasks', payload);
       return true;
@@ -277,13 +279,14 @@ class ApiRepository {
     }
   }
 
-  /// Create task and return (success, errorMessage). Use to show error in UI.
-  Future<(bool, String?)> createTaskWithMessage({
+  /// Create task and return (success, errorMessage, createdTask). Use to show error in UI and to show new task immediately.
+  Future<(bool, String?, TaskModel?)> createTaskWithMessage({
     required String title,
     String status = 'need_to_start',
     String? dueDate,
     int? assignedToId,
     int? projectId,
+    String? description,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -292,9 +295,14 @@ class ApiRepository {
         if (dueDate != null) 'dueDate': dueDate,
         if (assignedToId != null) 'assignedToId': assignedToId,
         if (projectId != null) 'projectId': projectId,
+        if (description != null && description.isNotEmpty) 'description': description,
       };
-      await _client.post('/api/tasks', payload);
-      return (true, null);
+      final res = await _client.post('/api/tasks', payload);
+      TaskModel? created;
+      if (res is Map<String, dynamic> && res['data'] != null && res['data'] is Map<String, dynamic>) {
+        created = _taskFromJson(res['data']! as Map<String, dynamic>);
+      }
+      return (true, null, created);
     } catch (e) {
       String msg = 'Failed to create task';
       if (e is DioException && e.response?.data is Map) {
@@ -305,27 +313,55 @@ class ApiRepository {
       } else if (e is DioException && e.response?.statusCode == 401) {
         msg = 'Please log in again';
       }
-      return (false, msg);
+      return (false, msg, null);
     }
   }
 
 
   Future<bool> updateTaskStatus({required String taskId, required String status}) async {
+    final result = await updateTaskStatusWithMessage(taskId: taskId, status: status);
+    return result.$1;
+  }
+
+  Future<(bool, String?)> updateTaskStatusWithMessage({required String taskId, required String status}) async {
     try {
       await _client.patch('/api/tasks/$taskId/status', {'status': status});
-      return true;
-    } catch (_) {
-      return false;
+      return (true, null);
+    } catch (e) {
+      String? msg;
+      if (e is DioException && e.response?.data is Map) {
+        final d = e.response!.data as Map<String, dynamic>;
+        msg = d['message']?.toString() ?? d['error']?.toString();
+      } else if (e is DioException && e.type == DioExceptionType.connectionError) {
+        msg = 'Cannot reach server. Is the backend running?';
+      }
+      return (false, msg);
     }
   }
 
   Future<bool> deleteTask(String taskId) async {
+    final result = await deleteTaskWithMessage(taskId);
+    return result.$1;
+  }
+
+  Future<(bool, String?)> deleteTaskWithMessage(String taskId) async {
     try {
       await _client.delete('/api/tasks/$taskId');
-      return true;
-    } catch (_) {
-      return false;
+      return (true, null);
+    } catch (e) {
+      String? msg;
+      if (e is DioException && e.response?.data is Map) {
+        final d = e.response!.data as Map<String, dynamic>;
+        msg = d['message']?.toString() ?? d['error']?.toString();
+      } else if (e is DioException && e.type == DioExceptionType.connectionError) {
+        msg = 'Cannot reach server. Is the backend running?';
+      }
+      return (false, msg);
     }
+  }
+
+  Future<void> deleteProject(int projectId) async {
+    await _client.delete('/api/projects/$projectId');
   }
 
   /// Kick (remove) user. Admin: anyone except admin. Manager: team leader or team member only.
@@ -391,6 +427,7 @@ class ApiRepository {
       assigneeName: json['assigneeName']?.toString(),
       projectId: pid is int ? pid : (pid != null ? int.tryParse(pid.toString()) : null),
       projectName: json['projectName']?.toString(),
+      description: json['description']?.toString(),
     );
   }
 }

@@ -14,6 +14,8 @@ public class TaskDto {
     private String status;
     @Schema(example = "2025-03-15")
     private LocalDate dueDate;
+    @Schema(example = "Investigate login edge cases")
+    private String description;
     @Schema(example = "3", description = "Assignee user ID")
     private Long assigneeId;
     @Schema(example = "Jane Doe", description = "Assignee display name")
@@ -54,6 +56,9 @@ public class TaskDto {
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
     }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public Long getAssigneeId() { return assigneeId; }
     public void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }

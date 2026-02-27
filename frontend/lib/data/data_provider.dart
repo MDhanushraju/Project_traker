@@ -113,13 +113,14 @@ class DataProvider {
   }) =>
       _api.createTask(title: title, status: status, dueDate: dueDate, assignedToId: assignedToId, projectId: projectId);
 
-  /// Create task and return (success, errorMessage). Use to show error in UI.
-  Future<(bool, String?)> createTaskWithMessage({
+  /// Create task and return (success, errorMessage, createdTask). Use to show error in UI and to show new task immediately.
+  Future<(bool, String?, TaskModel?)> createTaskWithMessage({
     required String title,
     String status = 'need_to_start',
     String? dueDate,
     int? assignedToId,
     int? projectId,
+    String? description,
   }) =>
       _api.createTaskWithMessage(
         title: title,
@@ -127,12 +128,18 @@ class DataProvider {
         dueDate: dueDate,
         assignedToId: assignedToId,
         projectId: projectId,
+        description: description,
       );
 
   Future<bool> updateTaskStatus({required String taskId, required String status}) =>
       _api.updateTaskStatus(taskId: taskId, status: status);
 
+  Future<(bool, String?)> updateTaskStatusWithMessage({required String taskId, required String status}) =>
+      _api.updateTaskStatusWithMessage(taskId: taskId, status: status);
+
   Future<bool> deleteTask(String taskId) => _api.deleteTask(taskId);
+
+  Future<(bool, String?)> deleteTaskWithMessage(String taskId) => _api.deleteTaskWithMessage(taskId);
 
   Future<bool> kickUser(int userId) => _api.kickUser(userId);
 
@@ -156,4 +163,13 @@ class DataProvider {
   Future<List<String>> getMemberProjects() => _api.getMemberProjects();
 
   Future<List<Map<String, String>>> getMemberContacts() => _api.getMemberContacts();
+
+  Future<bool> deleteProject(int projectId) async {
+    try {
+      await _api.deleteProject(projectId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

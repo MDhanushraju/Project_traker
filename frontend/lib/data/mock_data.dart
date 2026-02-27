@@ -54,6 +54,11 @@ class MockData {
 
   static List<ProjectModel> get projects => _projectsCache ?? [];
   static List<TaskModel> get tasks => _tasksCache ?? [];
+
+  /// Prepend a newly created task so it shows immediately before the next refresh.
+  static void prependTask(TaskModel task) {
+    _tasksCache = [task, ...?_tasksCache ?? []];
+  }
   static List<String> get upcomingTaskTitles => tasks.take(3).map((t) => t.title ?? '').toList();
   static int get projectCount => projects.length;
   static int get taskCount => tasks.length;

@@ -149,6 +149,22 @@ public class DataService {
         if (exists) {
             throw new AuthException("User is already assigned to this project");
         }
+        // One manager per project; max 3 team leaders per project; members unlimited.
+        if (projRole == ProjectRole.MANAGER) {
+            boolean hasManager = assignmentRepository.findByProjectId(projectId).stream()
+                    .anyMatch(a -> a.getProjectRole() == ProjectRole.MANAGER);
+            if (hasManager) {
+                throw new AuthException("This project already has a manager. Only one manager per project.");
+            }
+        }
+        if (projRole == ProjectRole.TEAM_LEADER) {
+            long leaderCount = assignmentRepository.findByProjectId(projectId).stream()
+                    .filter(a -> a.getProjectRole() == ProjectRole.TEAM_LEADER)
+                    .count();
+            if (leaderCount >= 3) {
+                throw new AuthException("This project already has the maximum of 3 team leaders.");
+            }
+        }
         assignmentRepository.save(new ProjectAssignment(project, user, projRole));
         return toUserSummary(user);
     }

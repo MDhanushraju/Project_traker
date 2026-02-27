@@ -52,13 +52,13 @@ public class TaskService {
     @Transactional
     public TaskDto createTask(CreateTaskRequest req) {
         String email = SecurityUtils.currentUserEmail();
-        User currentUser;
-        if (email == null || email.isBlank()) {
-            // No auth (local/dev): fall back to first user in DB so task creation still works.
+        User currentUser = (email != null && !email.isBlank())
+                ? userRepository.findByEmail(email.trim().toLowerCase()).orElse(null)
+                : null;
+        if (currentUser == null) {
+            // No auth or email not in DB (e.g. stale token): fall back to first user so task creation still works.
             currentUser = userRepository.findAll().stream().findFirst()
                     .orElseThrow(() -> new NotFoundException("No users found"));
-        } else {
-            currentUser = userRepository.findByEmail(email).orElseThrow(() -> new NotFoundException("User not found"));
         }
         User assignTo = req.getAssignedToId() != null
                 ? userRepository.findById(req.getAssignedToId()).orElse(currentUser)
@@ -67,6 +67,9 @@ public class TaskService {
         task.setTitle(req.getTitle().trim());
         task.setStatus(normalizeStatus(req.getStatus()));
         task.setAssignedTo(assignTo);
+        if (req.getDescription() != null && !req.getDescription().isBlank()) {
+            task.setDescription(req.getDescription().trim());
+        }
         if (req.getDueDate() != null && !req.getDueDate().isBlank()) {
             try {
                 task.setDueDate(LocalDate.parse(req.getDueDate(), DateTimeFormatter.ISO_LOCAL_DATE));
@@ -82,10 +85,11 @@ public class TaskService {
     @Transactional
     public TaskDto updateStatus(Long taskId, UpdateTaskStatusRequest req) {
         String email = SecurityUtils.currentUserEmail();
-        if (email == null || email.isBlank()) throw new ForbiddenException("Not authenticated");
-        User current = userRepository.findByEmail(email).orElseThrow(() -> new NotFoundException("User not found"));
         Task task = taskRepository.findById(taskId).orElseThrow(() -> new NotFoundException("Task not found"));
-        if (!canUpdateTask(current, task)) throw new ForbiddenException("You cannot update this task's status");
+        if (email != null && !email.isBlank()) {
+            User current = userRepository.findByEmail(email.trim().toLowerCase()).orElse(null);
+            if (current != null && !canUpdateTask(current, task)) throw new ForbiddenException("You cannot update this task's status");
+        }
         task.setStatus(normalizeStatus(req.getStatus()));
         task = taskRepository.save(task);
         return toDto(task);
@@ -122,7 +126,12 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(Long taskId) {
-        if (!taskRepository.existsById(taskId)) throw new NotFoundException("Task not found");
+        Task task = taskRepository.findById(taskId).orElseThrow(() -> new NotFoundException("Task not found"));
+        String email = SecurityUtils.currentUserEmail();
+        if (email != null && !email.isBlank()) {
+            User current = userRepository.findByEmail(email.trim().toLowerCase()).orElse(null);
+            if (current != null && !canUpdateTask(current, task)) throw new ForbiddenException("You cannot delete this task");
+        }
         taskRepository.deleteById(taskId);
     }
 
@@ -205,6 +214,7 @@ public class TaskService {
         dto.setTitle(t.getTitle());
         dto.setStatus(t.getStatus());
         if (t.getDueDate() != null) dto.setDueDate(t.getDueDate());
+        if (t.getDescription() != null) dto.setDescription(t.getDescription());
         if (t.getAssignedTo() != null) {
             dto.setAssigneeId(t.getAssignedTo().getId());
             dto.setAssigneeName(t.getAssignedTo().getFullName());

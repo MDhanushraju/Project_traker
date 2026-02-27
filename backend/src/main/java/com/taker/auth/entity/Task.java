@@ -14,6 +14,9 @@ public class Task {
     @Column(nullable = false)
     private String title;
 
+    @Column(name = "description", length = 1000)
+    private String description;
+
     @Column(nullable = false)
     private String status = "todo";
 
@@ -42,6 +45,8 @@ public class Task {
     public void setTitle(String title) { this.title = title; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public LocalDate getDueDate() { return dueDate; }
     public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
     public Project getProject() { return project; }

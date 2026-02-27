@@ -2,6 +2,7 @@ package com.taker.auth.service;
 
 import com.taker.auth.dto.ProjectDto;
 import com.taker.auth.dto.CreateProjectRequest;
+import com.taker.auth.exception.NotFoundException;
 import com.taker.auth.entity.Project;
 import com.taker.auth.repository.ProjectRepository;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,14 @@ public class ProjectService {
         Project project = new Project(name, status, progress);
         project = projectRepository.save(project);
         return toDto(project);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        if (!projectRepository.existsById(id)) {
+            throw new NotFoundException("Project not found");
+        }
+        projectRepository.deleteById(id);
     }
 
     private ProjectDto toDto(Project p) {

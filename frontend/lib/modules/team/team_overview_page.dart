@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_routes.dart';
+import '../../core/constants/task_status.dart';
 import '../../data/data_provider.dart';
+import '../tasks/models/task_model.dart';
 
 /// Team Overview: fetches project team (Manager, Team Leader(s), Team Members) from API.
 class TeamOverviewPage extends StatefulWidget {
@@ -17,11 +19,22 @@ class _TeamOverviewPageState extends State<TeamOverviewPage> {
   Map<String, dynamic>? _team;
   bool _loading = true;
   String? _error;
+  List<TaskModel> _projectTasks = [];
+  bool _tasksLoading = false;
+  String? _tasksError;
 
   @override
   void initState() {
     super.initState();
     _loadTeam();
+  }
+
+  @override
+  void didUpdateWidget(TeamOverviewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _loadTeam();
+    }
   }
 
   Future<void> _loadTeam() async {
@@ -38,9 +51,41 @@ class _TeamOverviewPageState extends State<TeamOverviewPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final team = await DataProvider.instance.getProjectTeam(id);
-      if (mounted) setState(() { _team = team; _loading = false; _error = team == null ? 'Project not found' : null; });
+      if (mounted) {
+        setState(() {
+          _team = team;
+          _loading = false;
+          _error = team == null ? 'Project not found' : null;
+        });
+      }
+      if (team != null && mounted) {
+        await _loadProjectTasks(id);
+      }
     } catch (_) {
       if (mounted) setState(() { _loading = false; _error = 'Failed to load team'; });
+    }
+  }
+
+  Future<void> _loadProjectTasks(int projectId) async {
+    setState(() {
+      _tasksLoading = true;
+      _tasksError = null;
+    });
+    try {
+      final allTasks = await DataProvider.instance.getTasks();
+      _projectTasks = allTasks.where((t) => t.projectId == projectId).toList();
+      if (mounted) {
+        setState(() {
+          _tasksLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _tasksLoading = false;
+          _tasksError = 'Failed to load project tasks';
+        });
+      }
     }
   }
 
@@ -49,20 +94,60 @@ class _TeamOverviewPageState extends State<TeamOverviewPage> {
     final theme = Theme.of(context);
     final projectName = _team?['projectName']?.toString() ?? 'Team';
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(_loading ? 'Team' : projectName),
+          centerTitle: true,
+          actions: [
+            if (!_loading && _error == null)
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: () => _loadTeam(),
+                tooltip: 'Refresh team',
+              ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Team'),
+              Tab(text: 'Project tasks'),
+            ],
+          ),
         ),
-        title: Text(_loading ? 'Team' : projectName),
-        centerTitle: true,
+        body: _loading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading team...'),
+                  ],
+                ),
+              )
+            : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline_rounded, size: 48, color: theme.colorScheme.error),
+                        const SizedBox(height: 16),
+                        Text(_error!, style: theme.textTheme.bodyLarge),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    children: [
+                      _buildTeamList(context),
+                      _buildProjectTasksTab(context),
+                    ],
+                  ),
       ),
-      body: _loading
-          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Loading team...')]))
-          : _error != null
-              ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.error_outline_rounded, size: 48, color: theme.colorScheme.error), const SizedBox(height: 16), Text(_error!, style: theme.textTheme.bodyLarge)]))
-              : _buildTeamList(context),
     );
   }
 
@@ -133,6 +218,151 @@ class _TeamOverviewPageState extends State<TeamOverviewPage> {
         ],
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  Widget _buildProjectTasksTab(BuildContext context) {
+    final theme = Theme.of(context);
+    final projectName = _team?['projectName']?.toString() ?? '';
+
+    if (_tasksLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading project tasks...'),
+          ],
+        ),
+      );
+    }
+
+    if (_tasksError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 48, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                _tasksError!,
+                style: theme.textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final members = _team!['members'] as List<dynamic>? ?? [];
+    if (members.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'No team members assigned to this project.',
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        if (projectName.isNotEmpty) ...[
+          Text(
+            projectName,
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tasks per member for this project',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+        ],
+        ...members.map((m) => _ProjectMemberTasksTile(member: m as Map<String, dynamic>, tasks: _projectTasks)),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _ProjectMemberTasksTile extends StatelessWidget {
+  const _ProjectMemberTasksTile({required this.member, required this.tasks});
+
+  final Map<String, dynamic> member;
+  final List<TaskModel> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rawId = member['id'];
+    final int? userId = rawId is int
+        ? rawId
+        : rawId is num
+            ? rawId.toInt()
+            : (rawId != null ? int.tryParse(rawId.toString()) : null);
+    final String name = (member['name'] ?? '').toString();
+    final String title = (member['title'] ?? '').toString();
+    final String position = (member['position'] ?? '').toString();
+    final String role = (member['projectRole'] ?? '').toString();
+
+    final memberTasks = userId == null ? <TaskModel>[] : tasks.where((t) => t.assigneeId == userId).toList();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: ExpansionTile(
+        title: Text(
+          name,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          [
+            if (position.isNotEmpty) position,
+            if (role.isNotEmpty) role.replaceAll('_', ' '),
+          ].where((e) => e.isNotEmpty).join(' · '),
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        children: memberTasks.isEmpty
+            ? [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'No tasks for this member in this project.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ),
+              ]
+            : memberTasks
+                .map(
+                  (t) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      t.title ?? 'Task',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      'Status: ${TaskStatus.label(t.status ?? '')}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                )
+                .toList(),
+      ),
     );
   }
 }

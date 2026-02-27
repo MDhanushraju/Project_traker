@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../data/data_provider.dart';
 import '../../data/positions_data.dart';
-import '../../data/team_members_data.dart';
+import '../projects/models/project_model.dart';
 
-/// Project role: 1 Manager, 1 Team Leader, multiple Team Members per project.
+/// Project role: 1 Manager per project; max 3 Team Leaders; Team Members unlimited.
 enum _ProjectRole {
   manager('Manager', '1 per project'),
-  teamLeader('Team Leader', '1 per project'),
+  teamLeader('Team Leader', 'Max 3 per project'),
   teamMember('Team Member', 'Unlimited');
 
   const _ProjectRole(this.label, this.hint);
@@ -14,8 +15,8 @@ enum _ProjectRole {
   final String hint;
 }
 
-/// Full-screen Assign Project form. Flow: Add project → Add members with roles.
-/// Roles: 1 Manager, 1 Team Leader, multiple Team Members (dynamic).
+/// Full-screen Assign Project form. Loads projects and users from API.
+/// Manager: show all managers, assign one per project. Team Leader: show all, unlimited.
 class AssignProjectPage extends StatefulWidget {
   const AssignProjectPage({super.key});
 
@@ -25,52 +26,102 @@ class AssignProjectPage extends StatefulWidget {
 
 class _AssignProjectPageState extends State<AssignProjectPage> {
   bool _sendNotification = true;
-  String? _selectedProject;
-  String? _selectedMember;
+  List<ProjectModel> _projects = [];
+  List<Map<String, dynamic>> _users = [];
+  Map<String, dynamic>? _projectTeam;
+  bool _loading = true;
+
+  String? _selectedProjectName;
+  int? _selectedProjectId;
+  Map<String, dynamic>? _selectedUser;
   _ProjectRole? _selectedRole;
   String? _selectedPosition;
   DateTime? _startDate;
   DateTime? _endDate;
 
-  /// Tracks assignments per project. Replace with API/state later.
-  final Map<String, Set<_ProjectRole>> _projectAssignments = {};
   final List<_AssignmentEntry> _currentAssignments = [];
 
-  List<TeamMemberData> get _membersForSelectedRoleAndPosition {
-    if (_selectedRole == null) return [];
-    if (_selectedRole == _ProjectRole.manager) return membersByRole(TeamMemberRole.manager);
-    if (_selectedPosition == null) return [];
-    return membersByPositionAndRole(_selectedPosition!, _selectedRole == _ProjectRole.teamLeader ? TeamMemberRole.teamLeader : TeamMemberRole.teamMember);
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
   }
 
-  TeamMemberRole? get _projectRoleToMemberRole {
-    if (_selectedRole == null) return null;
-    switch (_selectedRole!) {
-      case _ProjectRole.manager:
-        return TeamMemberRole.manager;
-      case _ProjectRole.teamLeader:
-        return TeamMemberRole.teamLeader;
-      case _ProjectRole.teamMember:
-        return TeamMemberRole.teamMember;
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    final projects = await DataProvider.instance.getProjects();
+    final users = await DataProvider.instance.getAllUsers();
+    if (mounted) {
+      setState(() {
+        _projects = projects;
+        _users = users;
+        _loading = false;
+      });
     }
   }
 
-  List<TeamMemberData> get _membersForSelectedRole => _membersForSelectedRoleAndPosition;
+  Future<void> _loadProjectTeam(int projectId) async {
+    final team = await DataProvider.instance.getProjectTeam(projectId);
+    if (mounted) setState(() => _projectTeam = team);
+  }
+
+  /// Users with the selected role from API (all managers, all team leaders, or all members).
+  List<Map<String, dynamic>> get _usersForSelectedRole {
+    if (_selectedRole == null) return [];
+    final roleStr = (Map<String, dynamic> u) => (u['role'] ?? '').toString().toLowerCase();
+    if (_selectedRole == _ProjectRole.manager) {
+      return _users.where((u) => roleStr(u) == 'manager').toList();
+    }
+    if (_selectedRole == _ProjectRole.teamLeader) {
+      return _users.where((u) => roleStr(u) == 'team_leader').toList();
+    }
+    if (_selectedRole == _ProjectRole.teamMember) {
+      if (_selectedPosition == null) return _users.where((u) => roleStr(u) == 'member').toList();
+      return _users.where((u) {
+        if (roleStr(u) != 'member') return false;
+        final pos = (u['position'] ?? u['title'] ?? '').toString();
+        return pos.toLowerCase().contains(_selectedPosition!.toLowerCase());
+      }).toList();
+    }
+    return [];
+  }
 
   String get _memberHint {
-    final list = _membersForSelectedRole;
+    final list = _usersForSelectedRole;
     if (list.isEmpty) return 'No users with this role';
     return 'Choose from ${list.length} ${_selectedRole!.label}(s)';
   }
 
+  /// Project already has a manager (from API team); only one manager per project.
+  bool get _projectHasManager {
+    if (_projectTeam == null) return false;
+    final members = _projectTeam!['members'];
+    if (members is! List) return false;
+    for (final m in members) {
+      if (m is Map && (m['projectRole'] ?? '').toString().toLowerCase() == 'manager') return true;
+    }
+    return false;
+  }
+
+  /// Project already has 3 team leaders (max per project).
+  bool get _projectHasThreeTeamLeaders {
+    if (_projectTeam == null) return false;
+    final members = _projectTeam!['members'];
+    if (members is! List) return false;
+    int count = 0;
+    for (final m in members) {
+      if (m is Map && (m['projectRole'] ?? '').toString().toLowerCase() == 'team_leader') count++;
+    }
+    return count >= 3;
+  }
+
+  /// Manager: only if project has no manager. Team Leader: only if fewer than 3. Member: always.
   List<_ProjectRole> get _availableRolesForProject {
-    if (_selectedProject == null) return _ProjectRole.values.toList();
-    final assigned = _projectAssignments[_selectedProject] ?? {};
+    if (_selectedProjectId == null) return _ProjectRole.values;
     return _ProjectRole.values.where((r) {
-      if (r == _ProjectRole.manager || r == _ProjectRole.teamLeader) {
-        return !assigned.contains(r);
-      }
-      return true; // Team Member: unlimited
+      if (r == _ProjectRole.manager && _projectHasManager) return false;
+      if (r == _ProjectRole.teamLeader && _projectHasThreeTeamLeaders) return false;
+      return true;
     }).toList();
   }
 
@@ -100,17 +151,23 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Select role first — only users with that role can be assigned. One Manager and one Team Leader per project.',
+              'Select role first. One Manager per project; Team Leaders and Members unlimited. When you select Manager, all managers are shown; when you select Team Leader, all team leaders are shown.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
             _DropdownField(
               label: 'Active Project',
               hint: 'Choose an active project.',
               icon: Icons.folder_outlined,
-              value: _selectedProject,
+              value: _selectedProjectName,
               onTap: () => _showProjectPicker(context),
             ),
             const SizedBox(height: 16),
@@ -121,23 +178,23 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
               value: _selectedRole?.label,
               onTap: () => _showRolePicker(context),
             ),
-            if (_selectedRole != null && _selectedRole != _ProjectRole.manager) ...[
+            if (_selectedRole != null && _selectedRole == _ProjectRole.teamMember) ...[
               const SizedBox(height: 16),
               _DropdownField(
-                label: 'Position (Team)',
-                hint: 'Select position (Developer, Tester, etc.)',
+                label: 'Position (optional)',
+                hint: 'Filter by position (Developer, Tester, etc.)',
                 icon: Icons.groups_rounded,
                 value: _selectedPosition,
                 onTap: () => _showPositionPicker(context),
               ),
             ],
-            if (_selectedRole != null && (_selectedRole == _ProjectRole.manager || _selectedPosition != null)) ...[
+            if (_selectedRole != null) ...[
               const SizedBox(height: 16),
               _DropdownField(
-                label: 'Team Member',
+                label: _selectedRole == _ProjectRole.manager ? 'Manager' : _selectedRole == _ProjectRole.teamLeader ? 'Team Leader' : 'Team Member',
                 hint: _memberHint,
                 icon: Icons.person_outline_rounded,
-                value: _selectedMember,
+                value: _selectedUser != null ? (_selectedUser!['fullName'] ?? _selectedUser!['name'] ?? '').toString() : null,
                 onTap: () => _showTeamMemberPicker(context),
               ),
             ],
@@ -152,7 +209,7 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
             ],
             const SizedBox(height: 8),
             Text(
-              'Manager: full control. Team Leader: edit & team management. Team Member: task execution.',
+              'Manager: one per project. Team Leader & Member: unlimited. Assign from Users with the selected role.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -219,6 +276,7 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
                 ),
               ),
             ),
+            ], // end if (!_loading)
             if (_currentAssignments.isNotEmpty) ...[
               const SizedBox(height: 32),
               const Divider(),
@@ -251,7 +309,7 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => setState(() {
-                    _selectedMember = null;
+                    _selectedUser = null;
                     _selectedRole = null;
                     _startDate = null;
                     _endDate = null;
@@ -269,42 +327,75 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
   }
 
   void _showProjectPicker(BuildContext context) {
+    if (_projects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No projects loaded')));
+      return;
+    }
     showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => _PickerSheet(
         title: 'Active Project',
-        options: const ['Website Redesign', 'Mobile App', 'API Integration', 'ALPHA', 'GAMMA'],
-        onSelected: (v) {
+        options: _projects.map((p) => p.name ?? '').where((n) => n.isNotEmpty).toList(),
+        onSelected: (name) {
+          ProjectModel? p;
+          for (final x in _projects) {
+            if (x.name == name) { p = x; break; }
+          }
+          final id = p != null ? int.tryParse(p.id ?? '') : null;
           setState(() {
-            _selectedProject = v;
+            _selectedProjectName = name;
+            _selectedProjectId = id;
             _selectedRole = null;
+            _selectedUser = null;
+            _projectTeam = null;
           });
           Navigator.pop(ctx);
+          if (id != null) _loadProjectTeam(id);
         },
       ),
     );
   }
 
   void _showTeamMemberPicker(BuildContext context) {
-    final members = _membersForSelectedRole;
-    if (members.isEmpty) {
+    final list = _usersForSelectedRole;
+    if (list.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No ${_selectedRole?.label ?? ''} users available')),
       );
       return;
     }
-    showModalBottomSheet<String>(
+    showModalBottomSheet<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => _PickerSheet(
-        title: 'Select ${_selectedRole?.label ?? 'Member'}',
-        options: members.map((m) => '${m.name}${m.isTemporary ? ' (Temp)' : ''}').toList(),
-        onSelected: (v) {
-          final name = v.replaceAll(' (Temp)', '');
-          setState(() => _selectedMember = name);
-          Navigator.pop(ctx);
-        },
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Select ${_selectedRole?.label ?? 'Member'}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            ...list.map((u) {
+              final name = (u['fullName'] ?? u['name'] ?? '').toString();
+              final id = u['id'];
+              final idInt = id is int ? id : (id != null ? int.tryParse(id.toString()) : null);
+              return ListTile(
+                title: Text(name),
+                subtitle: u['email'] != null ? Text((u['email']).toString()) : null,
+                onTap: () {
+                  Navigator.pop(ctx, idInt != null ? u : null);
+                },
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
-    );
+    ).then((user) {
+      if (user != null) setState(() => _selectedUser = user);
+    });
   }
 
   void _showPositionPicker(BuildContext context) {
@@ -319,7 +410,7 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
         title: 'Position',
         options: positions,
         onSelected: (v) {
-          setState(() { _selectedPosition = v; _selectedMember = null; });
+          setState(() { _selectedPosition = v; _selectedUser = null; });
           Navigator.pop(ctx);
         },
       ),
@@ -327,11 +418,12 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
   }
 
   void _showRolePicker(BuildContext context) {
-    setState(() { _selectedMember = null; _selectedPosition = null; });
+    setState(() { _selectedUser = null; _selectedPosition = null; });
+    if (_selectedProjectId != null && _projectTeam == null) _loadProjectTeam(_selectedProjectId!);
     final available = _availableRolesForProject;
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Manager and Team Leader already assigned for this project')),
+        const SnackBar(content: Text('This project already has a manager')),
       );
       return;
     }
@@ -382,37 +474,55 @@ class _AssignProjectPageState extends State<AssignProjectPage> {
     }
   }
 
-  void _onConfirm() {
-    if (_selectedProject == null || _selectedMember == null || _selectedRole == null) {
+  Future<void> _onConfirm() async {
+    if (_selectedProjectId == null || _selectedProjectName == null || _selectedUser == null || _selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select project, member, and role')),
+        const SnackBar(content: Text('Please select project, role, and user')),
       );
       return;
     }
     if (!_availableRolesForProject.contains(_selectedRole)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This role is already assigned for the selected project')),
+        const SnackBar(content: Text('This project already has a manager')),
       );
       return;
     }
 
-    _projectAssignments.putIfAbsent(_selectedProject!, () => {}).add(_selectedRole!);
-    _currentAssignments.add(_AssignmentEntry(
-      project: _selectedProject!,
-      member: _selectedMember!,
-      role: _selectedRole!.label,
-    ));
+    final userId = _selectedUser!['id'];
+    final userIdInt = userId is int ? userId : (userId != null ? int.tryParse(userId.toString()) : null);
+    if (userIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid user')));
+      return;
+    }
 
-    setState(() {
-      _selectedMember = null;
-      _selectedRole = null;
-      _startDate = null;
-      _endDate = null;
-    });
+    final roleStr = _selectedRole == _ProjectRole.manager ? 'manager' : _selectedRole == _ProjectRole.teamLeader ? 'team_leader' : 'team_member';
+    final name = (_selectedUser!['fullName'] ?? _selectedUser!['name'] ?? '').toString();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${_currentAssignments.last.member} assigned as ${_currentAssignments.last.role}')),
-    );
+    final result = await DataProvider.instance.assignUserToProject(userIdInt, _selectedProjectId!, roleStr);
+    if (!mounted) return;
+    if (result != null) {
+      final roleLabel = _selectedRole!.label;
+      _currentAssignments.add(_AssignmentEntry(
+        project: _selectedProjectName!,
+        member: name,
+        role: roleLabel,
+      ));
+      await _loadProjectTeam(_selectedProjectId!);
+      setState(() {
+        _selectedUser = null;
+        _selectedRole = null;
+        _selectedPosition = null;
+        _startDate = null;
+        _endDate = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$name assigned as $roleLabel')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to assign. User may already be on this project or project already has a manager.')),
+      );
+    }
   }
 }
 
