@@ -20,7 +20,7 @@ class TaskStatus {
       case needToStart:
       case yetToStart:
       case todo:
-        return 'Need to Start';
+        return 'Yet to start';
       case ongoing:
       case inProgress:
         return 'Ongoing';

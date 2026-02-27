@@ -16,6 +16,15 @@ class ProjectListPage extends StatefulWidget {
 }
 
 class _ProjectListPageState extends State<ProjectListPage> {
+  Future<void> _refreshProjects() async {
+    await MockData.refreshFromApi();
+    if (mounted) setState(() {});
+  }
+
+  void _navigateToAddProject() {
+    Navigator.of(context).pushNamed(AppRoutes.addNewProject).then((_) => _refreshProjects());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +90,14 @@ class _ProjectListPageState extends State<ProjectListPage> {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await _refreshProjects();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  label: const Text('Retry'),
+                ),
               ],
             ),
           ),
@@ -97,7 +114,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
           title: 'No projects yet',
           subtitle: 'Create a project to get started.',
           actionLabel: 'Add New Project',
-          onAction: () => Navigator.of(context).pushNamed(AppRoutes.addNewProject),
+          onAction: () => _navigateToAddProject(),
         ),
       );
     }
@@ -120,7 +137,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
                 ),
               ),
               FilledButton.icon(
-                onPressed: () => Navigator.of(context).pushNamed(AppRoutes.addNewProject),
+                onPressed: _navigateToAddProject,
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: const Text('Add New Project'),
               ),

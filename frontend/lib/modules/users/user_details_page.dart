@@ -4,6 +4,7 @@ import '../../app/app_routes.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/constants/roles.dart';
 import '../../data/data_provider.dart';
+import '../../data/mock_data.dart';
 import '../../data/positions_data.dart';
 
 /// Arguments for navigating to [UserDetailsPage].
@@ -376,8 +377,9 @@ void _showKickConfirm(BuildContext context, int userId, String userName) {
             Navigator.pop(ctx);
             final (ok, errorMsg) = await DataProvider.instance.kickUserWithMessage(userId);
             if (context.mounted) {
+              if (ok) await MockData.refreshFromApi();
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(ok ? '$userName has been removed' : (errorMsg?.isNotEmpty == true ? errorMsg! : 'Failed to kick user')),
                   backgroundColor: ok ? null : Theme.of(context).colorScheme.errorContainer,

@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../modules/projects/models/project_model.dart';
 import '../modules/tasks/models/task_model.dart';
 import 'api_repository.dart';
@@ -12,6 +14,25 @@ class DataProvider {
   Future<List<ProjectModel>> getProjects() => _api.getProjects();
 
   Future<List<TaskModel>> getTasks() => _api.getTasks();
+
+  /// Create a new project. Returns (true, null) on success, (false, errorMessage) on failure.
+  Future<(bool, String?)> createProjectWithMessage({
+    required String name,
+    String status = 'Active',
+    int progress = 0,
+  }) async {
+    try {
+      await _api.createProject(name: name, status: status, progress: progress);
+      return (true, null);
+    } catch (e) {
+      String msg = e.toString().replaceFirst(RegExp(r'^Exception:?\s*'), '');
+      if (e is DioException && e.response?.data is Map) {
+        final d = e.response!.data as Map<String, dynamic>;
+        msg = d['message']?.toString() ?? d['error']?.toString() ?? msg;
+      }
+      return (false, msg.isNotEmpty ? msg : 'Failed to create project');
+    }
+  }
 
   Future<int> getProjectCount() async {
     final list = await getProjects();
@@ -91,6 +112,22 @@ class DataProvider {
     int? projectId,
   }) =>
       _api.createTask(title: title, status: status, dueDate: dueDate, assignedToId: assignedToId, projectId: projectId);
+
+  /// Create task and return (success, errorMessage). Use to show error in UI.
+  Future<(bool, String?)> createTaskWithMessage({
+    required String title,
+    String status = 'need_to_start',
+    String? dueDate,
+    int? assignedToId,
+    int? projectId,
+  }) =>
+      _api.createTaskWithMessage(
+        title: title,
+        status: status,
+        dueDate: dueDate,
+        assignedToId: assignedToId,
+        projectId: projectId,
+      );
 
   Future<bool> updateTaskStatus({required String taskId, required String status}) =>
       _api.updateTaskStatus(taskId: taskId, status: status);

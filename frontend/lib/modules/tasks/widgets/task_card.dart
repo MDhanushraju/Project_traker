@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models/task_model.dart';
 import '../../../../core/constants/task_status.dart';
+import '../models/task_model.dart';
 
 /// Card for a single task. Uses theme. Shows status dropdown, delete, due date.
 class TaskCard extends StatelessWidget {
@@ -42,8 +42,6 @@ class TaskCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              _StatusIndicator(status: status),
-              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,6 +51,13 @@ class TaskCard extends StatelessWidget {
                       title,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      TaskStatus.label(status),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     if ((task.assigneeName ?? '').isNotEmpty || (task.projectName ?? '').isNotEmpty) ...[
@@ -69,18 +74,10 @@ class TaskCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (canEdit && onStatusChange != null)
-                          _StatusDropdown(
-                            value: status,
-                            onChanged: onStatusChange!,
-                          )
-                        else
-                          _StatusChip(status: status),
-                        if (dueDate != null && dueDate.isNotEmpty) ...[
-                          const SizedBox(width: 8),
+                    if (dueDate != null && dueDate.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
                           Icon(
                             Icons.calendar_today_rounded,
                             size: 14,
@@ -94,18 +91,26 @@ class TaskCard extends StatelessWidget {
                             ),
                           ),
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+              if (canEdit && onStatusChange != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _StatusDropdown(
+                    value: status,
+                    onChanged: onStatusChange!,
+                  ),
+                ),
               if (canEdit && onDelete != null)
                 IconButton(
                   icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error, size: 22),
                   onPressed: onDelete,
                   tooltip: 'Delete',
                 )
-              else
+              else if (!canEdit || onStatusChange == null)
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 14,

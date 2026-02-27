@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/constants/roles.dart';
 import '../../data/data_provider.dart';
+import '../../data/mock_data.dart';
 import '../../data/positions_data.dart';
 import '../../shared/layouts/main_layout.dart';
 import '../../app/app_routes.dart';
@@ -312,7 +313,9 @@ class _UsersPageState extends State<UsersPage> {
     if (mounted) {
       if (ok) {
         _loadUsers();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${user.name} has been removed')));
+        await MockData.refreshFromApi();
+        if (mounted) setState(() {});
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${user.name} has been removed')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(errorMsg?.isNotEmpty == true ? errorMsg! : 'Failed to kick user'),

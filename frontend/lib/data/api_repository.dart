@@ -12,25 +12,59 @@ class ApiRepository {
   final _client = ApiClient.instance;
 
   Future<List<ProjectModel>> getProjects() async {
-    try {
-      final res = await _client.get('/api/projects');
-      final data = res is List ? res : (res['data'] ?? res);
-      if (data is! List) return [];
-      return (data as List).map((e) => _projectFromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
-    }
+    final res = await _client.get('/api/projects');
+    final rawList = _extractList(res);
+    if (rawList == null || rawList.isEmpty) return [];
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(_projectFromJson)
+        .toList();
   }
 
   Future<List<TaskModel>> getTasks() async {
-    try {
-      final res = await _client.get('/api/tasks');
-      final data = res is List ? res : (res['data'] ?? res);
-      if (data is! List) return [];
-      return (data as List).map((e) => _taskFromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
+    final res = await _client.get('/api/tasks');
+    final List<dynamic>? rawList = _extractList(res);
+    if (rawList == null || rawList.isEmpty) return [];
+    final List<TaskModel> result = [];
+    for (final e in rawList) {
+      if (e is Map<String, dynamic>) {
+        try {
+          result.add(_taskFromJson(e));
+        } catch (_) {
+          // skip malformed item
+        }
+      }
     }
+    return result;
+  }
+
+  /// Extract list from API response: direct list, or map with 'data' / 'tasks' key.
+  static List<dynamic>? _extractList(dynamic res) {
+    if (res is List) return res;
+    if (res is! Map) return null;
+    final map = res as Map<String, dynamic>;
+    for (final key in ['data', 'tasks', 'content', 'items']) {
+      final v = map[key];
+      if (v is List) return v;
+    }
+    return null;
+  }
+
+  /// Create a new project. Returns the created project on success; throws on failure.
+  Future<ProjectModel> createProject({
+    required String name,
+    String status = 'Active',
+    int progress = 0,
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'status': status,
+      'progress': progress,
+    };
+    final res = await _client.post('/api/projects', payload);
+    final data = res is Map ? res['data'] : null;
+    if (data is Map<String, dynamic>) return _projectFromJson(data);
+    throw Exception('Invalid response from server');
   }
 
   Future<List<String>> getTeamLeaderProjects() async {
@@ -242,6 +276,39 @@ class ApiRepository {
       return false;
     }
   }
+
+  /// Create task and return (success, errorMessage). Use to show error in UI.
+  Future<(bool, String?)> createTaskWithMessage({
+    required String title,
+    String status = 'need_to_start',
+    String? dueDate,
+    int? assignedToId,
+    int? projectId,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'title': title,
+        'status': status,
+        if (dueDate != null) 'dueDate': dueDate,
+        if (assignedToId != null) 'assignedToId': assignedToId,
+        if (projectId != null) 'projectId': projectId,
+      };
+      await _client.post('/api/tasks', payload);
+      return (true, null);
+    } catch (e) {
+      String msg = 'Failed to create task';
+      if (e is DioException && e.response?.data is Map) {
+        final d = e.response!.data as Map<String, dynamic>;
+        msg = d['message']?.toString() ?? d['error']?.toString() ?? msg;
+      } else if (e is DioException && e.type == DioExceptionType.connectionError) {
+        msg = 'Cannot reach server. Is the backend running?';
+      } else if (e is DioException && e.response?.statusCode == 401) {
+        msg = 'Please log in again';
+      }
+      return (false, msg);
+    }
+  }
+
 
   Future<bool> updateTaskStatus({required String taskId, required String status}) async {
     try {

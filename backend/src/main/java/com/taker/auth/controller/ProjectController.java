@@ -1,6 +1,7 @@
 package com.taker.auth.controller;
 
 import com.taker.auth.dto.ApiResponse;
+import com.taker.auth.dto.CreateProjectRequest;
 import com.taker.auth.dto.ProjectDto;
 import com.taker.auth.dto.ProjectTeamDto;
 import com.taker.auth.service.DataService;
@@ -8,9 +9,12 @@ import com.taker.auth.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +37,12 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProjectDto>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("OK", projectService.findAll()));
+    }
+
+    @Operation(summary = "Create project", description = "Create a new project. Requires auth.")
+    @PostMapping
+    public ResponseEntity<ApiResponse<ProjectDto>> create(@Valid @RequestBody CreateProjectRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Project created", projectService.create(request)));
     }
 
     @Operation(summary = "Get project team", description = "Returns project team: manager, team leader(s), team member(s) with roles and photos.")

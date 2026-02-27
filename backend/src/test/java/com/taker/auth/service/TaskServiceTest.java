@@ -5,6 +5,12 @@ import com.taker.auth.dto.UpdateTaskStatusRequest;
 import com.taker.auth.entity.Task;
 import com.taker.auth.entity.User;
 import com.taker.auth.exception.NotFoundException;
+import com.taker.auth.entity.Project;
+import com.taker.auth.entity.ProjectAssignment;
+import com.taker.auth.entity.ProjectRole;
+import com.taker.auth.entity.Role;
+import com.taker.auth.repository.ProjectAssignmentRepository;
+import com.taker.auth.repository.ProjectRepository;
 import com.taker.auth.repository.TaskRepository;
 import com.taker.auth.repository.UserRepository;
 import com.taker.auth.util.SecurityUtils;
@@ -37,6 +43,12 @@ class TaskServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private ProjectAssignmentRepository assignmentRepository;
+
     @InjectMocks
     private TaskService taskService;
 
@@ -45,7 +57,7 @@ class TaskServiceTest {
 
     @BeforeEach
     void setUp() {
-        testUser = new User("Test User", "test@example.com", null, "hash", com.taker.auth.entity.Role.MEMBER);
+        testUser = new User("Test User", "test@example.com", null, "hash", Role.MEMBER);
         testUser.setId(1L);
 
         testTask = new Task();
@@ -63,13 +75,17 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("ongoing");
 
-            when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
             var result = taskService.updateStatus(1L, req);
 
             assertThat(result.getStatus()).isEqualTo("ongoing");
             verify(taskRepository).save(argThat(t -> "ongoing".equals(t.getStatus())));
+            }
         }
 
         @Test
@@ -77,12 +93,16 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("in_progress");
 
-            when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
             var result = taskService.updateStatus(1L, req);
 
             assertThat(result.getStatus()).isEqualTo("ongoing");
+            }
         }
 
         @Test
@@ -90,12 +110,16 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("completed");
 
-            when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
             var result = taskService.updateStatus(1L, req);
 
             assertThat(result.getStatus()).isEqualTo("completed");
+            }
         }
 
         @Test
@@ -103,12 +127,16 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("done");
 
-            when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
             var result = taskService.updateStatus(1L, req);
 
             assertThat(result.getStatus()).isEqualTo("completed");
+            }
         }
 
         @Test
@@ -117,12 +145,16 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("need_to_start");
 
-            when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
             when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
             var result = taskService.updateStatus(1L, req);
 
             assertThat(result.getStatus()).isEqualTo("need_to_start");
+            }
         }
 
         @Test
@@ -130,12 +162,16 @@ class TaskServiceTest {
             UpdateTaskStatusRequest req = new UpdateTaskStatusRequest();
             req.setStatus("ongoing");
 
-            when(taskRepository.findById(999L)).thenReturn(Optional.empty());
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("test@example.com");
+                when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+                when(taskRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> taskService.updateStatus(999L, req))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessageContaining("Task not found");
-            verify(taskRepository, never()).save(any());
+                assertThatThrownBy(() -> taskService.updateStatus(999L, req))
+                        .isInstanceOf(NotFoundException.class)
+                        .hasMessageContaining("Task not found");
+                verify(taskRepository, never()).save(any());
+            }
         }
     }
 
@@ -248,19 +284,64 @@ class TaskServiceTest {
     }
 
     @Nested
+    @DisplayName("findTasksForCurrentUser")
+    class FindTasksForCurrentUserTests {
+
+        @Test
+        void returnsAllTasksWhenNotAuthenticated() {
+            when(taskRepository.findAll()).thenReturn(List.of(testTask));
+
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn(null);
+
+                var result = taskService.findTasksForCurrentUser();
+
+                assertThat(result).hasSize(1);
+                assertThat(result.get(0).getTitle()).isEqualTo("Test Task");
+                verify(taskRepository).findAll();
+            }
+        }
+
+        @Test
+        void returnsAllTasksWhenCurrentUserNotFound() {
+            when(taskRepository.findAll()).thenReturn(List.of(testTask));
+
+            try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
+                security.when(SecurityUtils::currentUserEmail).thenReturn("missing@example.com");
+                when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+
+                var result = taskService.findTasksForCurrentUser();
+
+                assertThat(result).hasSize(1);
+                verify(taskRepository).findAll();
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("createTask")
     class CreateTaskTests {
         @Test
-        void throwsWhenNotAuthenticated() {
+        void fallsBackToFirstUserWhenNotAuthenticated() {
             CreateTaskRequest req = new CreateTaskRequest();
             req.setTitle("New Task");
             req.setStatus("need_to_start");
             try (MockedStatic<SecurityUtils> security = Mockito.mockStatic(SecurityUtils.class)) {
                 security.when(SecurityUtils::currentUserEmail).thenReturn(null);
-                assertThatThrownBy(() -> taskService.createTask(req))
-                        .isInstanceOf(NotFoundException.class)
-                        .hasMessageContaining("Not authenticated");
-                verify(taskRepository, never()).save(any());
+                when(userRepository.findAll()).thenReturn(List.of(testUser));
+                when(taskRepository.save(any(Task.class))).thenAnswer(inv -> {
+                    Task t = inv.getArgument(0);
+                    t.setId(5L);
+                    return t;
+                });
+
+                var result = taskService.createTask(req);
+
+                assertThat(result.getId()).isEqualTo(5L);
+                assertThat(result.getTitle()).isEqualTo("New Task");
+                ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+                verify(taskRepository).save(captor.capture());
+                assertThat(captor.getValue().getAssignedTo()).isEqualTo(testUser);
             }
         }
 

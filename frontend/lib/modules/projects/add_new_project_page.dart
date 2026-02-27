@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/data_provider.dart';
 import '../../data/positions_data.dart';
 import '../../data/team_members_data.dart';
 
@@ -381,7 +382,7 @@ class _AddNewProjectPageState extends State<AddNewProjectPage> {
     });
   }
 
-  void _onCreate() {
+  Future<void> _onCreate() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -389,10 +390,25 @@ class _AddNewProjectPageState extends State<AddNewProjectPage> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Project "$name" created')),
+    final (ok, errorMsg) = await DataProvider.instance.createProjectWithMessage(
+      name: name,
+      status: 'Active',
+      progress: 0,
     );
-    Navigator.of(context).pop();
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Project "$name" created')),
+      );
+      Navigator.of(context).pop(true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg ?? 'Failed to create project'),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        ),
+      );
+    }
   }
 }
 
